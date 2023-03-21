@@ -1,6 +1,6 @@
 import { pack } from "python-struct";
-import { createGzip, gzip, gzipSync } from "zlib";
-import { dumpBufferToString } from "../util/HexDumper";
+import { gzipSync } from "zlib";
+import { Entity } from "../interfaces/Entity";
 
 interface WorldOptions {
   sizeX?: number,
@@ -14,6 +14,7 @@ export class World {
 
   /** Initialized via generateSimple */
   private blocks: number[][][] = [];
+  private entities: Entity[] = []
 
   public getBlockAt(x: number, y: number, z: number): number {
     return this.blocks[x][y][z];
@@ -49,7 +50,7 @@ export class World {
   public packageForSending(): Buffer[] {
     console.log('Preparing level')
     console.log('Unrolling...')
-    let values: number[] = []
+    const values: number[] = []
     for (let zPos = 0; zPos < this.sizeZ; zPos++) {
       for (let yPos = 0; yPos < this.sizeY; yPos++) {
         for (let xPos = 0; xPos < this.sizeX; xPos++) {
@@ -58,27 +59,16 @@ export class World {
       }
     }
     
-    console.log('Prepending...')
     values.unshift(this.volume)
-    console.log(`Volume is ${this.volume}`)
-
-    console.log('Packing...')
-    let mapBuffer = pack(`>I${this.volume}B`, values)
-    console.log(`Mapbuffer length is ${mapBuffer.length}`)
-    console.log('Gzipping...')
-    let outgoingMapDataBuffer = gzipSync(mapBuffer)
-    console.log(`Gzip length is ${outgoingMapDataBuffer.length}`)
-
-    let mapParts: Buffer[] = []
+    const mapBuffer = pack(`>I${this.volume}B`, values)
+    const outgoingMapDataBuffer = gzipSync(mapBuffer)
+    const mapParts: Buffer[] = []
 
     let offset = 0
-    console.log('Splitting...')
     while (offset < outgoingMapDataBuffer.length) {
       mapParts.push(outgoingMapDataBuffer.subarray(offset, offset+1024))
       offset+=1024
     }
-    
-    console.log(`Produced ${mapParts.length} chunks`)
     return mapParts
   }
 
