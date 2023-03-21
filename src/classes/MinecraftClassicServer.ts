@@ -143,8 +143,7 @@ export class MinecraftClassicServer {
 
         //Spawn the new player for others
         this.broadcastNotSelf(OutgoingPackets.SpawnPlayer(newId, data.username, (16+newId)*32, 16*32, 16*32, 0, 0), newId)
-        //Set player's spawn point
-        joinedPlayer.sendPacket(OutgoingPackets.SpawnPlayer(-1, data.username, (16+newId)*32, 16*32, 16*32, 0, 0))
+        
 
 
 
@@ -156,12 +155,15 @@ export class MinecraftClassicServer {
           worldChunks.forEach((dataChunk, chunkIdx) => {
             clientSocket.write(OutgoingPackets.LevelDataChunk(dataChunk, chunkIdx, worldChunks.length), () => {
               if (chunkIdx == worldChunks.length-1) {
-                clientSocket.write(OutgoingPackets.LevelFinalize(world.sizeX, world.sizeY, world.sizeZ), () => {
-                  //Spawn others for the new player
-                  this.forEachPlayer((player, playerIdx) => {
-                    if (playerIdx != newId) {
-                      clientSocket.write(OutgoingPackets.SpawnPlayer(playerIdx, player.username, (16+playerIdx)*32, 16*32, 16*32, 0, 0))
-                    }
+                //Set player's spawn point
+                joinedPlayer.sendPacket(OutgoingPackets.SpawnPlayer(-1, data.username, (16+newId)*32, 16*32, 16*32, 0, 0)).then(() => {
+                  clientSocket.write(OutgoingPackets.LevelFinalize(world.sizeX, world.sizeY, world.sizeZ), () => {
+                    //Spawn others for the new player
+                    this.forEachPlayer((player, playerIdx) => {
+                      if (playerIdx != newId) {
+                        clientSocket.write(OutgoingPackets.SpawnPlayer(playerIdx, player.username, (16+playerIdx)*32, 16*32, 16*32, 0, 0))
+                      }
+                    })
                   })
                 })
               }
@@ -171,11 +173,14 @@ export class MinecraftClassicServer {
         break;
       }
 
+      //this should happen too, but doesn't
       case IncomingPacketType.PositionAndOrientation: {
         const data = new IncomingPackets.PositionAndOrientation(packet)
         this.broadcastNotSelf(OutgoingPackets.SetPositionAndOrientation(playerId, data.fX, data.fY, data.fZ, data.yaw, data.pitch), playerId)
         break;
       }
+
+      //setblock and message fall back to this
       default: 
         console.log(`Received unknown packet ${packetID.toString(16)} ${dumpBufferToString(packet)}`)
         break;
