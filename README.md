@@ -5,7 +5,7 @@ The goal of this project is to create a highly extensible Minecraft Classic serv
 
 The general idea is to not implement "Minecraft Classic 0.30" per se, as other servers do, but rather to create a platform on which several "game modes" defined outside of the server can be implemented. 
 
-Similarly to how Minetest is split into "minetest" and "minetest game" - an engine and a game built on top it, Luma is going to be split into "Luma" and "Luma Freebuild"
+Similarly to how Minetest is split into "minetest" and "minetest game" (+ a thousand other games) - an engine and a game built on top it, Luma is going to be split into "Luma" and "Luma Freebuild" (+ many more game modes made by you!)
 
 This project also intends to "backport" some later-game technical features into Classic, such as entities (...really?) and block states (redstone? eh, don't count on it)
 
