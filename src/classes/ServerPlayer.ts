@@ -1,5 +1,6 @@
 import { Socket } from "net";
-import { PlayerIdentification } from "../util/IncomingPackets";
+import { PlayerIdentification } from "../packet_wrappers/IncomingPackets";
+import { BlockFractionUnit, MVec3 } from "../util/Vectors/MVec3";
 
 /**
  * ServerPlayer describes a player connected to the server. It is bound to a `Player` entity in some `World`. This class can be used to send packets to a specific client.
@@ -18,12 +19,15 @@ export class ServerPlayer {
     })
   }
 
+  public position: MVec3<BlockFractionUnit>
+
   public socket: Socket
   public username = 'TESTIFICATE'
 
-  constructor(socket: Socket, player: PlayerIdentification) {
+  constructor(socket: Socket, player: PlayerIdentification, position: MVec3<BlockFractionUnit>) {
     this.socket = socket
     this.username = player.username
+    this.position = position
   }
   
 }

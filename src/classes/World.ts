@@ -1,6 +1,7 @@
 import { pack } from "python-struct";
 import { gzipSync } from "zlib";
 import { Entity } from "../interfaces/Entity";
+import { BlockFractionUnit, MVec3 } from "../util/Vectors/MVec3";
 
 interface WorldOptions {
   sizeX?: number,
@@ -12,7 +13,7 @@ type SimpleWorldgenCallback = (x: number, y: number, z: number) => number
 
 export class World {
 
-  /** Initialized via generateSimple */
+  /** Properly zero-filled in the constructor via generateSimple */
   private blocks: number[][][] = [];
   private entities: Entity[] = []
 
@@ -82,10 +83,14 @@ export class World {
   public get sizeZ() { return this._sizeZ }
   public get volume() { return this._volume }
 
+  public spawnPoint: MVec3<BlockFractionUnit>
+
   constructor(options: WorldOptions) {
     this._sizeX = options.sizeX || 64
     this._sizeY = options.sizeY || 64
     this._sizeZ = options.sizeZ || 64
+
+    this.spawnPoint = new MVec3<BlockFractionUnit>(16*32 as BlockFractionUnit, 16*32 as BlockFractionUnit, 16*32 as BlockFractionUnit)
 
     this._volume = this._sizeX * this._sizeY * this._sizeZ
 

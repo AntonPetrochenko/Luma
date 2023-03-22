@@ -17,11 +17,12 @@ import { dumpBufferToString } from '../util/HexDumper'
 import { ServerPlayer } from './ServerPlayer'
 import { World } from './World'
 import { Socket } from "net"
-import * as OutgoingPackets from "../util/OutgoingPackets"
-import * as IncomingPackets from "../util/IncomingPackets"
+import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
+import * as IncomingPackets from "../packet_wrappers/IncomingPackets"
+import { EventEmitter } from 'stream'
 
 type forEachPlayerCb = (player: ServerPlayer, index: number) => void
-export class MinecraftClassicServer {
+export class MinecraftClassicServer extends EventEmitter { //extending EventEmitter is a surprise tool that'll help us later
   private server: Net.Server
   public serverName: string
   public serverMOTD: string
@@ -31,11 +32,13 @@ export class MinecraftClassicServer {
   private _defaultWorld: World;
   public get defaultWorld(): World { return this._defaultWorld }
   constructor() {
+    super()
     this.serverName = `Metoot's Playground`
     this.serverMOTD = 'Node.js/TypeScript shenaniganry'
     this.server = Net.createServer((clientSocket) => {
+      clientSocket.setNoDelay(true)
       const pingInterval = setInterval(() => {
-        clientSocket.write(OutgoingPackets.Ping())
+          clientSocket.write(OutgoingPackets.Ping())
       },100)
       clientSocket.on('data', (incomingBuffer) => {
         this.handlePacket(incomingBuffer, clientSocket, this.findPlayerIdBySocket(clientSocket))
@@ -44,6 +47,7 @@ export class MinecraftClassicServer {
         clearInterval(pingInterval)
         const id = this.findPlayerIdBySocket(clientSocket)
 
+        //TODO: Need a better way of tracking players. This causes problems
         delete this.players[id]
         this.broadcast(OutgoingPackets.DespawnPlayer(id))
       })
@@ -86,7 +90,7 @@ export class MinecraftClassicServer {
     })
   }
 
-  broadcastNotSelf(packet: Buffer, playerId: number) {
+  broadcastNotSelf(playerId: number, packet: Buffer) {
     this.forEachPlayer((player, idx) => {
       if (idx != playerId) {
         player.sendPacket(packet)
@@ -122,15 +126,16 @@ export class MinecraftClassicServer {
   private handlePacket(packet: Buffer, clientSocket: Socket, playerId: number): void {
     
     const packetID = this.identifyIncomingPacket(packet)
+    const senderPlayer = this.players[playerId] as ServerPlayer // TODO: "as" shouldn't be necessary here.
 
     switch (packetID) {
       case IncomingPacketType.PlayerIdentification: {
-        const data = new IncomingPackets.PlayerIdentification(packet)
+        const data = IncomingPackets.PlayerIdentification.from(packet)
         console.log('Handing player connection')
         console.log(data)
         clientSocket.write(OutgoingPackets.ServerIdentification('A test server', 'We test!', true)) 
 
-        const joinedPlayer = new ServerPlayer(clientSocket, data)
+        const joinedPlayer = new ServerPlayer(clientSocket, data, this.defaultWorld.spawnPoint)
         let newId = 0
         for (let idx = 0; idx <= this.players.length; idx++) {
           if (!this.players[idx]) {
@@ -142,10 +147,7 @@ export class MinecraftClassicServer {
         console.log(`Joining player's ID is ${newId}`)
 
         //Spawn the new player for others
-        this.broadcastNotSelf(OutgoingPackets.SpawnPlayer(newId, data.username, (16+newId)*32, 16*32, 16*32, 0, 0), newId)
-        
-
-
+        this.broadcastNotSelf(newId, OutgoingPackets.SpawnPlayer(newId, data.username, this.defaultWorld.spawnPoint, 0, 0))
 
         clientSocket.write(OutgoingPackets.LevelInitialize(), () => {
           const world = MinecraftClassicServer.Instance.defaultWorld
@@ -156,12 +158,12 @@ export class MinecraftClassicServer {
             clientSocket.write(OutgoingPackets.LevelDataChunk(dataChunk, chunkIdx, worldChunks.length), () => {
               if (chunkIdx == worldChunks.length-1) {
                 //Set player's spawn point
-                joinedPlayer.sendPacket(OutgoingPackets.SpawnPlayer(-1, data.username, (16+newId)*32, 16*32, 16*32, 0, 0)).then(() => {
+                joinedPlayer.sendPacket(OutgoingPackets.SpawnPlayer(-1, data.username, this.defaultWorld.spawnPoint, 0, 0)).then(() => {
                   clientSocket.write(OutgoingPackets.LevelFinalize(world.sizeX, world.sizeY, world.sizeZ), () => {
                     //Spawn others for the new player
                     this.forEachPlayer((player, playerIdx) => {
                       if (playerIdx != newId) {
-                        clientSocket.write(OutgoingPackets.SpawnPlayer(playerIdx, player.username, (16+playerIdx)*32, 16*32, 16*32, 0, 0))
+                        clientSocket.write(OutgoingPackets.SpawnPlayer(playerIdx, player.username, this.defaultWorld.spawnPoint, 0, 0))
                       }
                     })
                   })
@@ -173,14 +175,32 @@ export class MinecraftClassicServer {
         break;
       }
 
-      //this should happen too, but doesn't
       case IncomingPacketType.PositionAndOrientation: {
-        const data = new IncomingPackets.PositionAndOrientation(packet)
-        this.broadcastNotSelf(OutgoingPackets.SetPositionAndOrientation(playerId, data.fX, data.fY, data.fZ, data.yaw, data.pitch), playerId)
+        const data = IncomingPackets.PositionAndOrientation.from(packet)
+        if ( ! data.position.isEqualTo(senderPlayer.position)) {
+          senderPlayer.position = data.position
+          this.broadcastNotSelf(playerId, OutgoingPackets.SetPositionAndOrientation(playerId, data.position, data.yaw, data.pitch))
+        }
         break;
       }
 
-      //setblock and message fall back to this
+      case IncomingPacketType.SetBlock: {
+        const data = IncomingPackets.SetBlock.from(packet)
+        console.log(`Placed block ${data.position.x} ${data.position.y} ${data.position.z}`)
+        if (data.placed) {
+          this.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
+        } else {
+          this.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
+        }
+        break;
+      }
+
+      case IncomingPacketType.Message: {
+        const data = IncomingPackets.Message.from(packet)
+        this.broadcast(OutgoingPackets.Message(data.text))
+        break;
+      }
+
       default: 
         console.log(`Received unknown packet ${packetID.toString(16)} ${dumpBufferToString(packet)}`)
         break;

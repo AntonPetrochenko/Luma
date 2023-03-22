@@ -1,6 +1,7 @@
 import { pack } from "python-struct";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { dumpBufferToString } from "./HexDumper";
+import { dumpBufferToString } from "../util/HexDumper";
+import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3";
 
 /** Helper to format strings in Classic's bizarre format */
 function mcstring(s: string): string {
@@ -39,14 +40,14 @@ export function LevelDataChunk(buf: Buffer, idx: number, total: number) {
 export function LevelFinalize(sizeX: number, sizeY: number, sizeZ: number) {
   return pack('>BHHH', [0x04, sizeX, sizeY, sizeZ])
 }
-export function SpawnPlayer(playerId: number, playerName: string, fX: number, fY: number, fZ: number, yaw: number, pitch: number) {
+export function SpawnPlayer(playerId: number, playerName: string, position: MVec3<BlockFractionUnit>, yaw: number, pitch: number) {
   const packet = pack('>Bb64sHHHBB', [
     0x07,
     playerId,
     mcstring(playerName),
-    fX,
-    fY,
-    fZ,
+    position.x,
+    position.y,
+    position.z,
     yaw,
     pitch
   ])
@@ -60,16 +61,34 @@ export function DespawnPlayer(playerId: number) {
   ])
 }
 
-export function SetPositionAndOrientation(playerId: number, fX: number, fY: number, fZ: number, yaw: number, pitch: number) {
+export function SetPositionAndOrientation(playerId: number, position: MVec3<BlockFractionUnit>, yaw: number, pitch: number) {
   return pack('>BbHHHBB', [
     0x08,
     playerId,
-    fX,
-    fY,
-    fZ,
+    position.x,
+    position.y,
+    position.z,
     yaw,
     pitch
   ]) 
+}
+
+export function SetBlock(position: MVec3<BlockUnit>, blockId: number) {
+  return pack('>BHHHB', [
+    0x06,
+    position.x,
+    position.y,
+    position.z,
+    blockId
+  ])
+}
+
+export function Message(text: string) {
+  return pack('>BB64s', [
+    0x0d,
+    0x00,
+    text
+  ])
 }
 
 export function Ping() {
