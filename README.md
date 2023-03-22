@@ -17,7 +17,7 @@ Broad scope development phases:
 - [ ] Luma Internal Goodies: catching up to speed with Minecraft, in a way
 - [ ] "Game Mode" system: what makes Luma truly special
 - [ ] "Luma Freebuild" game mode: what you're used to
-- [ ] Plugin system
+- [ ] Plugin system: let game modes be further extendable
 - [ ] Support, new nice things, etc...
 
 Current tasks:
