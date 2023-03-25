@@ -13,7 +13,7 @@
 import * as Net from 'net'
 import IncomingPacketType from '../enums/IncomingPacketType'
 import '../enums/MinecraftBlockID'
-import { dumpBufferToString } from '../util/HexDumper'
+import { dumpBufferToString } from '../util/Helpers/HexDumper'
 import { ServerPlayer } from './ServerPlayer'
 import { World } from './World'
 import { Socket } from "net"
@@ -29,8 +29,8 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
 
   private players: (ServerPlayer | undefined)[] = []
 
-  private _defaultWorld: World;
-  public get defaultWorld(): World { return this._defaultWorld }
+  public readonly defaultWorld: World;
+  
   constructor() {
     super()
     this.serverName = `Metoot's Playground`
@@ -43,17 +43,31 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       clientSocket.on('data', (incomingBuffer) => {
         this.handlePacket(incomingBuffer, clientSocket, this.findPlayerIdBySocket(clientSocket))
       })
-      clientSocket.on('close', () => {
+
+      const disconnect = (reason = '') => {
         clearInterval(pingInterval)
         const id = this.findPlayerIdBySocket(clientSocket)
+
+        this.broadcast(OutgoingPackets.Message(`&b${this.players[id]?.username} left the game ${reason}`))
 
         //TODO: Need a better way of tracking players. This causes problems
         delete this.players[id]
         this.broadcast(OutgoingPackets.DespawnPlayer(id))
+        
+      }
+      clientSocket.on('close', () => {
+        disconnect()
+      })
+      clientSocket.on("error", () => {
+        disconnect('due to an error')
       })
     })
 
-    this._defaultWorld = new World({}).generateSimple((x,y,z) => {
+    this.defaultWorld = new World({
+      sizeX: 1024,
+      sizeZ: 1024,
+      sizeY: 64
+    }).generateSimple((x,y,z) => {
       
       if (x == 10 && y == 10 && z == 10) return Block.Vanilla.Obsidian
 
@@ -109,7 +123,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
     })
   }
 
-  identifyIncomingPacket(packet: Buffer): IncomingPacketType {
+  identifyIncomingPacket(packet: Buffer): number {
     return packet.readInt8(0)
   }
 
@@ -147,7 +161,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
         console.log(`Joining player's ID is ${newId}`)
 
         //Spawn the new player for others
-        this.broadcastNotSelf(newId, OutgoingPackets.SpawnPlayer(newId, data.username, this.defaultWorld.spawnPoint, 0, 0))
+        this.broadcastNotSelf(newId, OutgoingPackets.SpawnPlayer(newId, data.username, joinedPlayer))
 
         clientSocket.write(OutgoingPackets.LevelInitialize(), () => {
           const world = MinecraftClassicServer.Instance.defaultWorld
@@ -158,12 +172,13 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
             clientSocket.write(OutgoingPackets.LevelDataChunk(dataChunk, chunkIdx, worldChunks.length), () => {
               if (chunkIdx == worldChunks.length-1) {
                 //Set player's spawn point
-                joinedPlayer.sendPacket(OutgoingPackets.SpawnPlayer(-1, data.username, this.defaultWorld.spawnPoint, 0, 0)).then(() => {
+                joinedPlayer.sendPacket(OutgoingPackets.SpawnPlayer(-1, data.username, joinedPlayer)).then(() => {
                   clientSocket.write(OutgoingPackets.LevelFinalize(world.sizeX, world.sizeY, world.sizeZ), () => {
                     //Spawn others for the new player
                     this.forEachPlayer((player, playerIdx) => {
                       if (playerIdx != newId) {
-                        clientSocket.write(OutgoingPackets.SpawnPlayer(playerIdx, player.username, this.defaultWorld.spawnPoint, 0, 0))
+                        clientSocket.write(OutgoingPackets.SpawnPlayer(playerIdx, player.username, player))
+                        this.broadcast(OutgoingPackets.Message(`&b${player.username} joined the game`))
                       }
                     })
                   })
@@ -177,27 +192,44 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
 
       case IncomingPacketType.PositionAndOrientation: {
         const data = IncomingPackets.PositionAndOrientation.from(packet)
+
+        let orientationUpdated = false
         if ( ! data.position.isEqualTo(senderPlayer.position)) {
+          //Update everything at once with a teleport packet
+          orientationUpdated = true
+          this.broadcastNotSelf(playerId, OutgoingPackets.SetPositionAndOrientation(playerId, senderPlayer))
+          senderPlayer.orientation = data.orientation
+          
           senderPlayer.position = data.position
-          this.broadcastNotSelf(playerId, OutgoingPackets.SetPositionAndOrientation(playerId, data.position, data.yaw, data.pitch))
+        }
+
+        if ( (! orientationUpdated) && (! data.orientation.isEqualTo(senderPlayer.orientation)) ) {
+          senderPlayer.orientation = data.orientation
+          this.broadcastNotSelf(playerId, OutgoingPackets.OrientationUpdate(playerId, senderPlayer.orientation))
         }
         break;
       }
 
       case IncomingPacketType.SetBlock: {
+        //TODO: Unlink from default world
         const data = IncomingPackets.SetBlock.from(packet)
         console.log(`Placed block ${data.position.x} ${data.position.y} ${data.position.z}`)
         if (data.placed) {
+          this.defaultWorld.setBlockAtMVec3(data.blockId, data.position)
           this.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
         } else {
+          this.defaultWorld.setBlockAtMVec3(Block.Vanilla.Air, data.position)
           this.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
         }
+        
+        console.log(`Block is now ${this.defaultWorld.getBlockAtMVec3(data.position)}`)
+        
         break;
       }
 
       case IncomingPacketType.Message: {
         const data = IncomingPackets.Message.from(packet)
-        this.broadcast(OutgoingPackets.Message(data.text))
+        this.broadcast(OutgoingPackets.Message(`${senderPlayer.username}: ${data.text}`))
         break;
       }
 

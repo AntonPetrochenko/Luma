@@ -12,16 +12,16 @@ This project also intends to "backport" some later-game technical features into 
 ## Checklist
 
 Broad scope development phases:
-- [ ] 0.30 protocol + general architecture: let there be server software
+- [x] 0.30 protocol: let there be server software
+- [ ] "Game Mode" system: what makes Luma truly special
 - [ ] CPE support: catching up with the community
 - [ ] Luma Internal Goodies: catching up to speed with Minecraft, in a way
-- [ ] "Game Mode" system: what makes Luma truly special
 - [ ] "Luma Freebuild" game mode: what you're used to
 - [ ] Plugin system: let game modes be further extendable
 - [ ] Support, new nice things, etc...
 
 Current tasks:
-- [ ] Motion, block placement, chat
+- [x] Motion, block placement, chat
 - [ ] Proper multiworld (better to get this done as early as possible)
 - [ ] Persistent level storage. Gonna need a custom format for the goodies.
 

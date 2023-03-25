@@ -1,5 +1,6 @@
 import { unpack } from "python-struct"
 import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3"
+import { Orientation } from "../util/Vectors/Orientation"
 
 export class PlayerIdentification{
   constructor(
@@ -17,13 +18,12 @@ export class PositionAndOrientation{
   constructor(
     public playerId: number,
     public position: MVec3<BlockFractionUnit>,
-    public yaw: number,
-    public pitch: number
+    public orientation: Orientation
   ) {}
   
   static from(packet: Buffer) {
     const data = unpack('>BBHHHBB', packet) as [number, number, BlockFractionUnit, BlockFractionUnit, BlockFractionUnit, number, number]
-    return new this(data[1], new MVec3<BlockFractionUnit>( data[2], data[3], data[4] ), data[5], data[6]) 
+    return new this(data[1], new MVec3<BlockFractionUnit>( data[2], data[3], data[4] ), new Orientation(data[5], data[6])) 
   }
 }
 

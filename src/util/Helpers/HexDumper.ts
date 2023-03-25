@@ -1,14 +1,14 @@
-export function dumpBufferToString(buf: Buffer, width: number = 8) {
-  let lineNumbers: number[] = []
-  let hexLines: string[] = []
-  let asciiLines: string[] = []
+export function dumpBufferToString(buf: Buffer, width = 8) {
+  const lineNumbers: number[] = []
+  const hexLines: string[] = []
+  const asciiLines: string[] = []
   for (let lineOffset = 0; lineOffset < buf.length; lineOffset=lineOffset+width) {
     lineNumbers.push(lineOffset)
-    let currentLineHex: string[] = []
+    const currentLineHex: string[] = []
     let currentLineAscii = ''
     for (let lineByte = 0; lineByte < 8; lineByte++) {
       if (lineOffset+lineByte < buf.length) {
-        let currentByte = buf[lineOffset+lineByte]
+        const currentByte = buf[lineOffset+lineByte]
         currentLineHex.push( currentByte.toString(16).padStart(2,'0') )
         currentLineAscii += (currentByte >= 32 && currentByte <= 127) ? String.fromCharCode(currentByte) : '¿'
       } else {

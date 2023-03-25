@@ -1,7 +1,9 @@
 import { pack } from "python-struct";
+import { Mobile } from "../classes/Entity/EntityBase";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { dumpBufferToString } from "../util/HexDumper";
+import { dumpBufferToString } from "../util/Helpers/HexDumper";
 import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3";
+import { Orientation } from "../util/Vectors/Orientation";
 
 /** Helper to format strings in Classic's bizarre format */
 function mcstring(s: string): string {
@@ -40,16 +42,16 @@ export function LevelDataChunk(buf: Buffer, idx: number, total: number) {
 export function LevelFinalize(sizeX: number, sizeY: number, sizeZ: number) {
   return pack('>BHHH', [0x04, sizeX, sizeY, sizeZ])
 }
-export function SpawnPlayer(playerId: number, playerName: string, position: MVec3<BlockFractionUnit>, yaw: number, pitch: number) {
+export function SpawnPlayer(playerId: number, playerName: string, player: Mobile) {
   const packet = pack('>Bb64sHHHBB', [
     0x07,
     playerId,
     mcstring(playerName),
-    position.x,
-    position.y,
-    position.z,
-    yaw,
-    pitch
+    player.position.x,
+    player.position.y,
+    player.position.z,
+    player.orientation.yaw,
+    player.orientation.pitch
   ])
   // console.log(`Created SpawnPlayer${dumpBufferToString(packet)}`)
   return packet
@@ -61,16 +63,35 @@ export function DespawnPlayer(playerId: number) {
   ])
 }
 
-export function SetPositionAndOrientation(playerId: number, position: MVec3<BlockFractionUnit>, yaw: number, pitch: number) {
+export function SetPositionAndOrientation(playerId: number, player: Mobile) {
   return pack('>BbHHHBB', [
     0x08,
     playerId,
-    position.x,
-    position.y,
-    position.z,
-    yaw,
-    pitch
+    player.position.x,
+    player.position.y,
+    player.position.z,
+    player.orientation.yaw,
+    player.orientation.pitch
   ]) 
+}
+
+export function PositionUpdate(playerId: number, deltaPosition: MVec3<BlockFractionUnit>) {
+  return pack('>BbBBB', [
+    0x0a,
+    playerId,
+    deltaPosition.x,
+    deltaPosition.y,
+    deltaPosition.z
+  ])
+}
+
+export function OrientationUpdate(playerId: number, orientation: Orientation) {
+  return pack('>BbBB', [
+    0x0b,
+    playerId,
+    orientation.yaw,
+    orientation.pitch
+  ])
 }
 
 export function SetBlock(position: MVec3<BlockUnit>, blockId: number) {
@@ -87,7 +108,7 @@ export function Message(text: string) {
   return pack('>BB64s', [
     0x0d,
     0x00,
-    text
+    text.substring(0,64)
   ])
 }
 
