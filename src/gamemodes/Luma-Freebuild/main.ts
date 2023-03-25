@@ -1,8 +1,8 @@
-import { MinecraftClassicServer } from "../../classes/MinecraftClassicServer";
-import { World } from "../../classes/World";
-import { CommandEvent } from "../../events/CommandEvent";
-import { SetBlockEvent } from "../../events/SetBlockEvent";
-import { GameMode } from "../../interfaces/GameMode";
+import { MinecraftClassicServer } from "../../luma/classes/MinecraftClassicServer";
+import { World } from "../../luma/classes/World";
+import { CommandEvent } from "../../luma/events/CommandEvent";
+import { SetBlockEvent } from "../../luma/events/SetBlockEvent";
+import { GameMode } from "../../luma/interfaces/GameMode";
 
 export default class Freebuild implements GameMode {
   setup(world: World, server: MinecraftClassicServer) {

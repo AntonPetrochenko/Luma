@@ -1,4 +1,4 @@
-import { MinecraftClassicServer } from "./classes/MinecraftClassicServer";
+import { MinecraftClassicServer } from "./luma/classes/MinecraftClassicServer";
 
 
 const server = MinecraftClassicServer.Instance

@@ -21,9 +21,9 @@ Broad scope development phases:
 - [ ] Support, new nice things, etc...
 
 Current tasks:
-- [x] Motion, block placement, chat
-- [ ] Proper multiworld (better to get this done as early as possible)
-- [ ] Persistent level storage. Gonna need a custom format for the goodies.
+- Implement game mode loading
+- Proper multiworld (better to get this done as early as possible)
+- Persistent level storage. Gonna need a custom format for the goodies.
 
 Future important tasks:
 - [ ] Implement ray-casting for CPE PlayerClick
