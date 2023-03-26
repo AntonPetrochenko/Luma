@@ -4,6 +4,7 @@ import { PlayerInitiatedEvent } from "../interfaces/Events";
 export class CommandEvent implements PlayerInitiatedEvent {
   public deniedMessage = ''
   public denied = false
+  public handled = false
   constructor(
     public player: ServerPlayer,
     public command: string,
@@ -12,6 +13,9 @@ export class CommandEvent implements PlayerInitiatedEvent {
   deny(message?: string): void {
     this.denied = true
     this.deniedMessage = message ?? '&cPermission denied.'
+  }
+  markHandled() {
+    this.handled = true
   }
 
 }

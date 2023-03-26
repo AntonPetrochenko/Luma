@@ -1,5 +1,6 @@
 import { MinecraftClassicServer } from "./luma/classes/MinecraftClassicServer";
 
 
-const server = MinecraftClassicServer.Instance
-server.listen(9999)
+MinecraftClassicServer.getInstance().then((server) => {
+  server.listen(9999)
+})

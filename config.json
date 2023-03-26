@@ -1,0 +1,23 @@
+{
+    "name": "Unnamed server",
+    "motd": "Nothing to say about this server",
+    "defaultWorld": "lobby",
+    "worlds": {
+        "lobby": {
+            "gamemode": "luma-lobby",
+            "size": [
+                64,
+                64,
+                64
+            ]
+        },
+        "freebuild": {
+            "gamemode": "luma-freebuild",
+            "size": [
+                64,
+                64,
+                64
+            ]
+        }
+    }
+}

@@ -1,8 +1,11 @@
 import { pack } from "python-struct";
 import { EventEmitter } from "stream";
 import { gzipSync } from "zlib";
+import { GameMode } from "../interfaces/GameMode";
+import { EntityIdTracker } from "../util/EntityIdTracker";
 import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3";
 import { EntityBase } from "./Entity/EntityBase";
+import { ServerPlayer } from "./ServerPlayer";
 
 interface WorldOptions {
   sizeX?: number,
@@ -10,13 +13,34 @@ interface WorldOptions {
   sizeZ?: number,
 }
 
-type SimpleWorldgenCallback = (x: number, y: number, z: number) => number
+type SimpleWorldgenCallback = (x: number, y: number, z: number, sizeX: number, sizeY: number, sizeZ: number) => number
 
 export class World extends EventEmitter {
 
   /** Properly zero-filled in the constructor via generateSimple */
   private blocks: Uint8Array;
-  private entities: EntityBase[] = []
+  public players = new Set<ServerPlayer>()
+  public entities = new Set<EntityBase>()
+  private gamemode: GameMode | undefined
+
+  private idTracker = new EntityIdTracker(128)
+
+  public bindPlayer(player: ServerPlayer) {
+    //Deliberately letting next line crash. Game modes are gonna need to set up player and entity limits on their own
+    const newId = this.idTracker.take()
+
+    player.entityId = newId
+    player.world = this
+
+    this.players.add(player)
+
+    return newId
+  }
+
+  public unbindPlayer(player: ServerPlayer) {
+    this.players.delete(player)
+    this.idTracker.return(player.entityId)
+  }
 
   private blockIndex(x: number, y: number, z: number) {
     //height is Y
@@ -47,7 +71,7 @@ export class World extends EventEmitter {
     for (let xPos = 0; xPos < this.sizeX; xPos++) {
       for (let yPos = 0; yPos < this.sizeY; yPos++) {
         for (let zPos = 0; zPos < this.sizeZ; zPos++) {
-          this.setBlockAtPos(cb(xPos, yPos, zPos), xPos, yPos, zPos)
+          this.setBlockAtPos(cb(xPos, yPos, zPos, this.sizeX, this.sizeY, this.sizeZ), xPos, yPos, zPos)
         }
       }  
     }
@@ -107,5 +131,20 @@ export class World extends EventEmitter {
     this.blocks = new Uint8Array(this.volume)
 
     console.log(`Created a new world with size ${this.sizeX}x${this.sizeY}x${this.sizeZ} (volume is ${this.volume})`)
+  }
+
+
+  broadcastNotSelf(excludePlayer: ServerPlayer, packet: Buffer) {
+    this.players.forEach( (targetPlayer) => {
+      if (targetPlayer != excludePlayer) {
+        targetPlayer.sendPacket(packet)
+      }
+    })
+  }
+
+  broadcast(packet: Buffer) {
+    this.players.forEach( (player) => {
+      player.sendPacket(packet)
+    })
   }
 }

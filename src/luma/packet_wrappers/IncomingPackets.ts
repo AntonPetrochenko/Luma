@@ -47,6 +47,6 @@ export class Message {
   
   static from(packet: Buffer) {
     const data = unpack('>BB64s', packet) as [number, number, string]
-    return new this(data[2])
+    return new this(data[2].trimEnd())
   }
 }

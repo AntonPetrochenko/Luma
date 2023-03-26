@@ -20,94 +20,151 @@ import { Socket } from "net"
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
 import * as IncomingPackets from "../packet_wrappers/IncomingPackets"
 import { EventEmitter } from 'stream'
+import { Config } from '../util/Config'
+import * as glob from 'glob'
+import * as path from 'path'
+import { GameModeModule } from '../interfaces/GameMode'
+import { CommandEvent } from '../events/CommandEvent'
 
-type forEachPlayerCb = (player: ServerPlayer, index: number) => void
+const defaultConfig =
+  {
+    name: 'Unnamed server',
+    motd: 'Nothing to say about this server',
+    defaultWorld: 'lobby',
+    worlds: {
+      lobby: {
+        gamemode: 'luma-lobby',
+        size: [64, 64, 64]
+      },
+      freebuild: {
+        gamemode: 'luma-freebuild',
+        size: [64, 64, 64]
+      }
+    }
+  }
 export class MinecraftClassicServer extends EventEmitter { //extending EventEmitter is a surprise tool that'll help us later
   private server: Net.Server
-  public serverName: string
-  public serverMOTD: string
+  public config: Config<typeof defaultConfig>
 
-  private players: (ServerPlayer | undefined)[] = []
+  private players = new Set<ServerPlayer>
 
   public readonly defaultWorld: World;
+
+  private readonly worlds: Map<string, World> = new Map()
   
-  constructor() {
+  private constructor(config: Config<typeof defaultConfig>, gamemodes: Map<string, GameModeModule>) {
     super()
-    this.serverName = `Metoot's Playground`
-    this.serverMOTD = 'Node.js/TypeScript shenaniganry'
+    this.config = config
+    
+    
+    //Create TCP server
     this.server = Net.createServer((clientSocket) => {
       clientSocket.setNoDelay(true)
+
+      
+      const joinedPlayer = new ServerPlayer(clientSocket, this.defaultWorld)
+      this.players.add(joinedPlayer)
+
       const pingInterval = setInterval(() => {
           clientSocket.write(OutgoingPackets.Ping())
       },100)
       clientSocket.on('data', (incomingBuffer) => {
-        this.handlePacket(incomingBuffer, clientSocket, this.findPlayerIdBySocket(clientSocket))
+        this.handlePacket(incomingBuffer, clientSocket)
       })
 
       const disconnect = (reason = '') => {
         clearInterval(pingInterval)
-        const id = this.findPlayerIdBySocket(clientSocket)
+        const player = this.findPlayerBySocket(clientSocket)
 
-        this.broadcast(OutgoingPackets.Message(`&b${this.players[id]?.username} left the game ${reason}`))
+        this.broadcast(OutgoingPackets.Message(`&b${player.username} left the game ${reason}`))
 
         //TODO: Need a better way of tracking players. This causes problems
-        delete this.players[id]
-        this.broadcast(OutgoingPackets.DespawnPlayer(id))
+        this.players.delete(player)
+        this.broadcast(OutgoingPackets.DespawnPlayer(player.entityId))
         
       }
       clientSocket.on('close', () => {
-        disconnect()
+        if (this.tryFindPlayerBySocket(clientSocket)) {
+          disconnect()
+        }
       })
       clientSocket.on("error", () => {
         disconnect('due to an error')
       })
     })
 
-    this.defaultWorld = new World({
-      sizeX: 1024,
-      sizeZ: 1024,
-      sizeY: 64
-    }).generateSimple((x,y,z) => {
-      
-      if (x == 10 && y == 10 && z == 10) return Block.Vanilla.Obsidian
+    //Create worlds according to config
 
-      if (z == 10 && y == 10) return Block.Vanilla.Bricks
-      if (x == 10 && z == 10) return Block.Vanilla.Leaves
-      if (y == 10 && x == 10) return Block.Vanilla.StationaryWater
-      
-
-      if (x == 0) return Block.Vanilla.RedCloth
-      if (y == 0) return Block.Vanilla.GreenCloth
-      if (z == 0) return Block.Vanilla.UltramarineCloth
-      
-      return Block.Vanilla.Air
-    })
-  }
-
-  findPlayerIdBySocket(socket: Socket) {
-    return this.players.findIndex((player) => {
-      return player?.socket == socket
-    })
-  }
-
-  forEachPlayer(cb: forEachPlayerCb) {
-    this.players.forEach((player, index) => {
-      if (player) {
-        cb(player, index)
+    for (const [worldKey, worldInfo] of Object.entries(this.config.settings.worlds)) {
+      if (this.worlds.has(worldKey)) {
+        throw new Error(`Error initializing worlds: duplicate entry ${worldKey}`)
       }
-    })
+
+      if ( ! gamemodes.has(worldInfo.gamemode) ) {
+        throw new Error((`Error initializing world "${worldKey}": missing gamemode ${worldInfo.gamemode}`))
+      }
+
+      const newWorld = new World({
+        sizeX: worldInfo.size[0],
+        sizeY: worldInfo.size[1],
+        sizeZ: worldInfo.size[3]
+      })
+
+      const worldGameModeModule = gamemodes.get(worldInfo.gamemode)
+      //Make TypeScript happy. I guess, map can have a slot set as undefined.
+      if (typeof worldGameModeModule == 'undefined') {
+        throw new Error('GameMode has loaded, but is undefined. This should never happen. You win!')
+      }
+      const worldGameModeClass = worldGameModeModule.default
+      const worldGameMode = (new worldGameModeClass())
+
+      worldGameMode.setup(newWorld, this)
+
+      this.worlds.set(worldKey, newWorld)
+    }
+
+    if ( ! this.worlds.has(this.config.settings.defaultWorld)) {
+      throw new Error(`Unable to set default world: no such world ${this.config.settings.defaultWorld}`)
+    }
+
+    //Again, to make TypeScript happy
+    const worldToSetAsDefault = this.worlds.get(this.config.settings.defaultWorld)
+    if ( typeof worldToSetAsDefault == 'undefined') {
+      throw new Error('World to be set as default was undefined, despite having been found. This should never happen. You win!')
+    }
+    this.defaultWorld = worldToSetAsDefault
+    
+
+  }
+
+  tryFindPlayerBySocket(socket: Socket) {
+    for (const [player] of this.players.entries()) {
+      if (player.socket == socket) {
+        return player
+      }
+    }
+    return undefined
+  }
+
+  findPlayerBySocket(socket: Socket) {
+    for (const [player] of this.players.entries()) {
+      if (player.socket == socket) {
+        return player
+      }
+    }
+    throw new Error('No player found for socket. Something went wrong!')
   }
 
   broadcast(packet: Buffer) {
-    this.forEachPlayer((player) => {
+    this.players.forEach( (player) => {
       player.sendPacket(packet)
     })
   }
 
-  broadcastNotSelf(playerId: number, packet: Buffer) {
-    this.forEachPlayer((player, idx) => {
-      if (idx != playerId) {
-        player.sendPacket(packet)
+  broadcastNotSelf(player: ServerPlayer, packet: Buffer) {
+    this.players.forEach( (targetPlayer) => {
+      if (targetPlayer != player) {
+        targetPlayer.sendPacket(packet)
       }
     })
   }
@@ -128,65 +185,49 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
   }
 
   private static _instance: MinecraftClassicServer
-  public static get Instance(): MinecraftClassicServer {
+  public static async getInstance(): Promise<MinecraftClassicServer> {
     if (this._instance) {
       return this._instance
     } else {
-      this._instance = new MinecraftClassicServer()
+      const config = Config.from('../config.json', defaultConfig)
+      this._instance = new MinecraftClassicServer(config, await MinecraftClassicServer.loadGameModeModules())
       return this._instance
     }
   }
 
-  private handlePacket(packet: Buffer, clientSocket: Socket, playerId: number): void {
+  private static async loadGameModeModules(): Promise<Map<string, GameModeModule>> {
+    console.log('Loading game modes...')
+    const loadedGameModes = new Map<string, GameModeModule>()
+    const entryPoints = glob.sync('./gamemodes/**/main.js')
+    for (const entryPoint of entryPoints) {
+      const entryPointPath = path.resolve(entryPoint)
+      const gameModeModule = (await require(entryPointPath)) as GameModeModule
+
+      if (loadedGameModes.has(gameModeModule.meta.identifier)) {
+        throw new Error(`Module loading conflict: game mode identified as "${gameModeModule.meta.identifier}" has already been loaded!`)
+      }
+
+      console.log(`Imported ${gameModeModule.meta.identifier}`)
+      loadedGameModes.set(gameModeModule.meta.identifier, gameModeModule)
+
+    }
+
+    return loadedGameModes
+  }
+
+  private async handlePacket(packet: Buffer, clientSocket: Socket): Promise<void> {
     
     const packetID = this.identifyIncomingPacket(packet)
-    const senderPlayer = this.players[playerId] as ServerPlayer // TODO: "as" shouldn't be necessary here.
+    const sender = this.findPlayerBySocket(clientSocket)
 
     switch (packetID) {
       case IncomingPacketType.PlayerIdentification: {
         const data = IncomingPackets.PlayerIdentification.from(packet)
-        console.log('Handing player connection')
-        console.log(data)
-        clientSocket.write(OutgoingPackets.ServerIdentification('A test server', 'We test!', true)) 
+        clientSocket.write(OutgoingPackets.ServerIdentification(this.config.settings.name, this.config.settings.motd, true)) 
 
-        const joinedPlayer = new ServerPlayer(clientSocket, data, this.defaultWorld.spawnPoint)
-        let newId = 0
-        for (let idx = 0; idx <= this.players.length; idx++) {
-          if (!this.players[idx]) {
-            newId = idx
-            break
-          }
-        }
-        this.players[newId] = joinedPlayer
-        console.log(`Joining player's ID is ${newId}`)
-
-        //Spawn the new player for others
-        this.broadcastNotSelf(newId, OutgoingPackets.SpawnPlayer(newId, data.username, joinedPlayer))
-
-        clientSocket.write(OutgoingPackets.LevelInitialize(), () => {
-          const world = MinecraftClassicServer.Instance.defaultWorld
-          const worldChunks = world.packageForSending()
-  
-          /// callback hell.. thanks, node!
-          worldChunks.forEach((dataChunk, chunkIdx) => {
-            clientSocket.write(OutgoingPackets.LevelDataChunk(dataChunk, chunkIdx, worldChunks.length), () => {
-              if (chunkIdx == worldChunks.length-1) {
-                //Set player's spawn point
-                joinedPlayer.sendPacket(OutgoingPackets.SpawnPlayer(-1, data.username, joinedPlayer)).then(() => {
-                  clientSocket.write(OutgoingPackets.LevelFinalize(world.sizeX, world.sizeY, world.sizeZ), () => {
-                    //Spawn others for the new player
-                    this.forEachPlayer((player, playerIdx) => {
-                      if (playerIdx != newId) {
-                        clientSocket.write(OutgoingPackets.SpawnPlayer(playerIdx, player.username, player))
-                        this.broadcast(OutgoingPackets.Message(`&b${player.username} joined the game`))
-                      }
-                    })
-                  })
-                })
-              }
-            })
-          })
-        })
+        sender.username = data.username
+        sender.sendToWorld(this.defaultWorld)
+        
         break;
       }
 
@@ -194,18 +235,18 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
         const data = IncomingPackets.PositionAndOrientation.from(packet)
 
         let orientationUpdated = false
-        if ( ! data.position.isEqualTo(senderPlayer.position)) {
+        if ( ! data.position.isEqualTo(sender.position)) {
           //Update everything at once with a teleport packet
           orientationUpdated = true
-          this.broadcastNotSelf(playerId, OutgoingPackets.SetPositionAndOrientation(playerId, senderPlayer))
-          senderPlayer.orientation = data.orientation
+          sender.world.broadcastNotSelf(sender, OutgoingPackets.SetPositionAndOrientation(sender.entityId, sender))
+          sender.orientation = data.orientation
           
-          senderPlayer.position = data.position
+          sender.position = data.position
         }
 
-        if ( (! orientationUpdated) && (! data.orientation.isEqualTo(senderPlayer.orientation)) ) {
-          senderPlayer.orientation = data.orientation
-          this.broadcastNotSelf(playerId, OutgoingPackets.OrientationUpdate(playerId, senderPlayer.orientation))
+        if ( (! orientationUpdated) && (! data.orientation.isEqualTo(sender.orientation)) ) {
+          sender.orientation = data.orientation
+          sender.world.broadcastNotSelf(sender, OutgoingPackets.OrientationUpdate(sender.entityId, sender.orientation))
         }
         break;
       }
@@ -213,23 +254,40 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       case IncomingPacketType.SetBlock: {
         //TODO: Unlink from default world
         const data = IncomingPackets.SetBlock.from(packet)
-        console.log(`Placed block ${data.position.x} ${data.position.y} ${data.position.z}`)
         if (data.placed) {
-          this.defaultWorld.setBlockAtMVec3(data.blockId, data.position)
-          this.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
+          sender.world.setBlockAtMVec3(data.blockId, data.position)
+          sender.world.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
         } else {
           this.defaultWorld.setBlockAtMVec3(Block.Vanilla.Air, data.position)
-          this.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
+          sender.world.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
         }
-        
-        console.log(`Block is now ${this.defaultWorld.getBlockAtMVec3(data.position)}`)
         
         break;
       }
 
       case IncomingPacketType.Message: {
         const data = IncomingPackets.Message.from(packet)
-        this.broadcast(OutgoingPackets.Message(`${senderPlayer.username}: ${data.text}`))
+        //Recognize whether or not the message is a command
+        if (data.text.match(/^\//)) {
+          //Is a command. Consume the message, raise an event on the server.
+          const argv = data.text.split(' ')
+          const commandName = argv[0].replace('/', '')
+          const commandArgs = argv.slice(1)
+          const evt = new CommandEvent(sender, commandName, commandArgs )
+          this.emit(`command-${commandName}`, evt)
+          console.log(`Consumed command. Fired event "command-${commandName}". ${commandName} ${commandArgs.join(', ')}`)
+
+          if (evt.denied) {
+            sender.sendPacket(OutgoingPackets.Message(evt.deniedMessage))
+          }
+
+          if ( ! (evt.handled || evt.denied) ) {
+            sender.sendPacket(OutgoingPackets.Message('&cUnknown command!'))
+          }
+          
+        } else {
+          this.broadcast(OutgoingPackets.Message(`${sender.username}: ${data.text}`))
+        }
         break;
       }
 
