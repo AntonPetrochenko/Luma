@@ -26,8 +26,10 @@ For game modes, an event system is required (arbitrary decision)
 For game modes, multiworld and config is required (arbitrary decision)
 
 Current tasks:
-- Implement game mode loading
-- Proper multiworld (better to get this done as early as possible)
+- Proper multiworld... done, I think? Needs testing
+- Testing multiworld is gonna need an out of order LevelInitialize, which is a CPE thing
+- Therefore, CPE time!
+- Events for everything
 - Persistent level storage. Gonna need a custom format for the goodies.
 
 Future important tasks:
