@@ -2,13 +2,41 @@ import { Socket } from "net";
 import { BlockFractionUnit, MVec3 } from "../util/Vectors/MVec3";
 import { Orientation } from "../util/Vectors/Orientation";
 import { Mobile } from "./Entity/EntityBase";
+import { MinecraftClassicServer } from "./MinecraftClassicServer";
 import { World } from "./World";
-import * as OutgoingPackets from '../packet_wrappers/OutgoingPackets'
+
+
+
+export function verifyNetworkSafe(player: UnsafePlayer): player is NetworkSafePlayer {
+  return player.entityId !== undefined && player.world !== undefined && player.world.players.has(player)
+}
+/**
+ * - Helper type: Make sure the player is in the world it claims to be in, and it connected to the server
+ * - Verify via `verifyNetworkSafe`
+ */
+export interface NetworkSafePlayer extends UnsafePlayer {
+  entityId: number,
+  world: World,
+  connected: true
+}
+
+
+export function verifyWorldSafe(player: UnsafePlayer, world: World): player is WorldSafePlayer {
+  return player.entityId !== undefined && world.players.has(player) && player.world == world
+}
 
 /**
- * ServerPlayer describes a player connected to the server. It is bound to a `Player` entity in some `World`. This class can be used to send packets to a specific client.
+ * - Helper type: Make sure player is in the world you want them to be in, and is connected to the server
+ * - Check via verifyWorldSafe
  */
-export class ServerPlayer implements Mobile {
+export interface WorldSafePlayer extends UnsafePlayer {
+  entityId: number
+  world: World
+  connected: true
+}
+
+
+export class UnsafePlayer implements Mobile {
   
   public sendPacket(packet: Buffer): Promise<void> {
     return new Promise((resolve) => {
@@ -21,10 +49,11 @@ export class ServerPlayer implements Mobile {
 
 
   public handleClose = true
+  public connected = true
 
-  public entityId = 0
+  public entityId: undefined | number
 
-  public world: World
+  public world: undefined | World
   public position = new MVec3<BlockFractionUnit>(32*16 as BlockFractionUnit, 32*36 as BlockFractionUnit, 32*16 as BlockFractionUnit)
   public orientation = new Orientation(0,0)
 
@@ -53,37 +82,15 @@ export class ServerPlayer implements Mobile {
 
   public async sendToWorld(targetWorld: World) {
 
-    const newId = targetWorld.bindPlayer(this)
+    //Enforce redundant data is correct: unbind player from all worlds, if able
+    const server = await MinecraftClassicServer.getInstance()
+    server.worlds.forEach( (serverWorld) => {
+      if (verifyWorldSafe(this, serverWorld)) serverWorld.unbindPlayer(this)
+    } )
+
+    const newId: number = await targetWorld.bindPlayer(this)
     console.log(`Bound new player to world, id ${newId}`)
 
-    //Spawn the new player for others
-    targetWorld.broadcastNotSelf(this, OutgoingPackets.SpawnPlayer(newId, this.username, this))
-
-    await this.sendPacket(OutgoingPackets.LevelInitialize())
-    
-    
-    const worldChunks = targetWorld.packageForSending()
-    for (let chunkIdx = 0; chunkIdx < worldChunks.length; chunkIdx++) {
-      const dataChunk = worldChunks[chunkIdx]
-      await this.sendPacket(OutgoingPackets.LevelDataChunk(dataChunk, chunkIdx, worldChunks.length))
-    }
-
-    
-    //Set player's spawn point
-    await this.sendPacket(OutgoingPackets.SpawnPlayer(-1, this.username, this))
-
-    await this.sendPacket(OutgoingPackets.LevelFinalize(targetWorld.sizeX, targetWorld.sizeY, targetWorld.sizeZ))
-
-    //Spawn others for the new player
-    targetWorld.players.forEach( (existingPlayer) => {
-      if (this != existingPlayer) {
-        console.log(`Telling ${this.username} that ${existingPlayer.username} is ${existingPlayer.entityId}`)
-        this.sendPacket(OutgoingPackets.SpawnPlayer(existingPlayer.entityId, existingPlayer.username, existingPlayer))
-      }
-    })
-    
-    targetWorld.broadcast(OutgoingPackets.Message(`&b${this.username} joined the world`))
-      
   }
   
   

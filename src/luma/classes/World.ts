@@ -5,7 +5,9 @@ import { GameMode } from "../interfaces/GameMode";
 import { EntityIdTracker } from "../util/EntityIdTracker";
 import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3";
 import { EntityBase } from "./Entity/EntityBase";
-import { ServerPlayer } from "./ServerPlayer";
+import { UnsafePlayer, WorldSafePlayer  } from "./ServerPlayer";
+import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
+import { WorldJoinProcedure } from "../packet_wrappers/ComplexProcedures";
 
 interface WorldOptions {
   sizeX?: number,
@@ -19,27 +21,33 @@ export class World extends EventEmitter {
 
   /** Properly zero-filled in the constructor via generateSimple */
   private blocks: Uint8Array;
-  public players = new Set<ServerPlayer>()
+  public players = new Set<UnsafePlayer>()
   public entities = new Set<EntityBase>()
   private gamemode: GameMode | undefined
 
   private idTracker = new EntityIdTracker(128)
 
-  public bindPlayer(player: ServerPlayer) {
+  public async bindPlayer(boundPlayer: UnsafePlayer) {
     //Deliberately letting next line crash. Game modes are gonna need to set up player and entity limits on their own
     const newId = this.idTracker.take()
 
-    player.entityId = newId
-    player.world = this
+    boundPlayer.entityId = newId
+    boundPlayer.world = this
 
-    this.players.add(player)
+    this.players.add(boundPlayer)
+
+    WorldJoinProcedure(boundPlayer, this)
 
     return newId
   }
 
-  public unbindPlayer(player: ServerPlayer) {
-    this.players.delete(player)
-    this.idTracker.return(player.entityId)
+  public unbindPlayer(player: WorldSafePlayer) {
+      this.players.delete(player)
+      this.idTracker.return(player.entityId)
+      
+      this.broadcast(OutgoingPackets.DespawnPlayer(player.entityId));
+      (player as UnsafePlayer).entityId = undefined
+      this.broadcast(OutgoingPackets.Message(`&b${player.username} left the world`))
   }
 
   private blockIndex(x: number, y: number, z: number) {
@@ -134,7 +142,7 @@ export class World extends EventEmitter {
   }
 
 
-  broadcastNotSelf(excludePlayer: ServerPlayer, packet: Buffer) {
+  broadcastNotSelf(excludePlayer: UnsafePlayer, packet: Buffer) {
     this.players.forEach( (targetPlayer) => {
       if (targetPlayer != excludePlayer) {
         targetPlayer.sendPacket(packet)

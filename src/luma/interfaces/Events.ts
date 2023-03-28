@@ -1,9 +1,11 @@
 import { MinecraftClassicServer } from "../classes/MinecraftClassicServer"
-import { ServerPlayer } from "../classes/ServerPlayer"
+import { UnsafePlayer } from "../classes/ServerPlayer"
 import { World } from "../classes/World"
 
+
+
 export interface PlayerInitiatedEvent {
-  player: ServerPlayer
+  player: UnsafePlayer 
   deny(): void
 }
 

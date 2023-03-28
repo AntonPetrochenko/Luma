@@ -1,4 +1,4 @@
-import { ServerPlayer } from "../classes/ServerPlayer"
+import { UnsafePlayer } from "../classes/ServerPlayer"
 import { PlayerInitiatedEvent } from "../interfaces/Events"
 import { BlockUnit, MVec3 } from "../util/Vectors/MVec3"
 
@@ -18,7 +18,7 @@ export class SetBlockEvent implements PlayerInitiatedEvent {
 
   public overridden = false
   constructor(
-    public readonly player: ServerPlayer,
+    public readonly player: UnsafePlayer,
     public readonly blockId: number,
     public readonly position: MVec3<BlockUnit>,
     public readonly placeMode: boolean

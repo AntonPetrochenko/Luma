@@ -1,4 +1,4 @@
-import { ServerPlayer } from "../classes/ServerPlayer";
+import { UnsafePlayer } from "../classes/ServerPlayer";
 import { PlayerInitiatedEvent } from "../interfaces/Events";
 
 export class CommandEvent implements PlayerInitiatedEvent {
@@ -6,7 +6,7 @@ export class CommandEvent implements PlayerInitiatedEvent {
   public denied = false
   public handled = false
   constructor(
-    public player: ServerPlayer,
+    public player: UnsafePlayer,
     public command: string,
     public args: string[]
   ) {}

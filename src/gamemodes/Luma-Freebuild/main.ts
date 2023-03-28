@@ -12,6 +12,16 @@ export const meta: GameModeMeta = {
 
 export default class implements GameMode {
   setup(world: World, server: MinecraftClassicServer) {
+    world.generateSimple((x, y, z, sx, sy) => {
+      const waterLevel = sy/2-3
+      if (y<=waterLevel) {
+        if (Math.random() < 0.5)
+          return Block.Vanilla.UltramarineCloth
+        else
+          return Block.Vanilla.CyanCloth
+      }
+      return Block.Vanilla.Air
+    })
     world.on('setblock', (evt: SetBlockEvent) => {
       console.log(`Freebuild block ${evt.blockId}} placed!`)
     })

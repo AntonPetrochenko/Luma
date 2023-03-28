@@ -14,7 +14,7 @@ import * as Net from 'net'
 import IncomingPacketType from '../enums/IncomingPacketType'
 import '../enums/MinecraftBlockID'
 import { dumpBufferToString } from '../util/Helpers/HexDumper'
-import { ServerPlayer } from './ServerPlayer'
+import { UnsafePlayer, verifyNetworkSafe } from './ServerPlayer'
 import { World } from './World'
 import { Socket } from "net"
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
@@ -46,11 +46,11 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
   private server: Net.Server
   public config: Config<typeof defaultConfig>
 
-  private players = new Set<ServerPlayer>
+  private players = new Set<UnsafePlayer | UnsafePlayer>
 
   public readonly defaultWorld: World;
 
-  private readonly worlds: Map<string, World> = new Map()
+  public worlds: Map<string, World> = new Map()
   
   private constructor(config: Config<typeof defaultConfig>, gamemodes: Map<string, GameModeModule>) {
     super()
@@ -62,7 +62,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       clientSocket.setNoDelay(true)
 
       
-      const joinedPlayer = new ServerPlayer(clientSocket, this.defaultWorld)
+      const joinedPlayer = new UnsafePlayer(clientSocket, this.defaultWorld)
       this.players.add(joinedPlayer)
 
       const pingInterval = setInterval(() => {
@@ -75,13 +75,11 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       const disconnect = (reason = '') => {
         clearInterval(pingInterval)
         const player = this.findPlayerBySocket(clientSocket)
-
-        this.broadcast(OutgoingPackets.Message(`&b${player.username} left the game ${reason}`))
-
-        //TODO: Need a better way of tracking players. This causes problems
+        if (verifyNetworkSafe(player)) {
+          player.world.unbindPlayer(player)
+        }
         this.players.delete(player)
-        this.broadcast(OutgoingPackets.DespawnPlayer(player.entityId))
-        
+        this.broadcast(OutgoingPackets.Message(`&b${player.username} left the game ${reason}`))
       }
       clientSocket.on('close', () => {
         if (this.tryFindPlayerBySocket(clientSocket)) {
@@ -161,7 +159,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
     })
   }
 
-  broadcastNotSelf(player: ServerPlayer, packet: Buffer) {
+  broadcastNotSelf(player: UnsafePlayer, packet: Buffer) {
     this.players.forEach( (targetPlayer) => {
       if (targetPlayer != player) {
         targetPlayer.sendPacket(packet)
@@ -232,21 +230,23 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       }
 
       case IncomingPacketType.PositionAndOrientation: {
-        const data = IncomingPackets.PositionAndOrientation.from(packet)
-
-        let orientationUpdated = false
-        if ( ! data.position.isEqualTo(sender.position)) {
-          //Update everything at once with a teleport packet
-          orientationUpdated = true
-          sender.world.broadcastNotSelf(sender, OutgoingPackets.SetPositionAndOrientation(sender.entityId, sender))
-          sender.orientation = data.orientation
-          
-          sender.position = data.position
-        }
-
-        if ( (! orientationUpdated) && (! data.orientation.isEqualTo(sender.orientation)) ) {
-          sender.orientation = data.orientation
-          sender.world.broadcastNotSelf(sender, OutgoingPackets.OrientationUpdate(sender.entityId, sender.orientation))
+        if (verifyNetworkSafe(sender)) {
+          const data = IncomingPackets.PositionAndOrientation.from(packet)
+  
+          let orientationUpdated = false
+          if ( ! data.position.isEqualTo(sender.position)) {
+            //Update everything at once with a teleport packet
+            orientationUpdated = true
+            sender.world.broadcastNotSelf(sender, OutgoingPackets.SetPositionAndOrientation(sender.entityId, sender))
+            sender.orientation = data.orientation
+            
+            sender.position = data.position
+          }
+  
+          if ( (! orientationUpdated) && (! data.orientation.isEqualTo(sender.orientation)) ) {
+            sender.orientation = data.orientation
+            sender.world.broadcastNotSelf(sender, OutgoingPackets.OrientationUpdate(sender.entityId, sender.orientation))
+          }
         }
         break;
       }
@@ -254,12 +254,14 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       case IncomingPacketType.SetBlock: {
         //TODO: Unlink from default world
         const data = IncomingPackets.SetBlock.from(packet)
-        if (data.placed) {
-          sender.world.setBlockAtMVec3(data.blockId, data.position)
-          sender.world.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
-        } else {
-          this.defaultWorld.setBlockAtMVec3(Block.Vanilla.Air, data.position)
-          sender.world.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
+        if (verifyNetworkSafe(sender)) {
+          if (data.placed) {
+            sender.world.setBlockAtMVec3(data.blockId, data.position)
+            sender.world.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
+          } else {
+            this.defaultWorld.setBlockAtMVec3(Block.Vanilla.Air, data.position)
+            sender.world.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
+          }
         }
         
         break;

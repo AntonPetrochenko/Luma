@@ -8,8 +8,6 @@ export class EntityIdTracker {
     }
 
     this.maxLength = maxLength
-
-    console.log(`Available IDs:`, this.availableIds)
   }
 
   public return(id: number): void {
