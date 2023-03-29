@@ -14,7 +14,7 @@ import * as Net from 'net'
 import IncomingPacketType from '../enums/IncomingPacketType'
 import '../enums/MinecraftBlockID'
 import { dumpBufferToString } from '../util/Helpers/HexDumper'
-import { UnsafePlayer, verifyNetworkSafe } from './ServerPlayer'
+import { UnsafePlayer, verifyNetworkSafe, verifyWorldSafe } from './ServerPlayer'
 import { World } from './World'
 import { Socket } from "net"
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
@@ -25,6 +25,9 @@ import * as glob from 'glob'
 import * as path from 'path'
 import { GameModeModule } from '../interfaces/GameMode'
 import { CommandEvent } from '../events/CommandEvent'
+import { PlayerJoinEvent } from '../events/PlayerJoinEvent'
+import { PlayerMovedEvent } from '../events/PlayerMovedEvent'
+import { SetBlockEvent } from '../events/SetBlockEvent'
 
 const defaultConfig =
   {
@@ -221,46 +224,76 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
     switch (packetID) {
       case IncomingPacketType.PlayerIdentification: {
         const data = IncomingPackets.PlayerIdentification.from(packet)
-        clientSocket.write(OutgoingPackets.ServerIdentification(this.config.settings.name, this.config.settings.motd, true)) 
+        sender.sendPacket(OutgoingPackets.ServerIdentification(this.config.settings.name, this.config.settings.motd, true)) 
 
         sender.username = data.username
         sender.sendToWorld(this.defaultWorld)
-        
+
+        if (verifyWorldSafe(sender, this.defaultWorld)) {
+          const evt = new PlayerJoinEvent(sender)
+          this.defaultWorld.emit('player-join', evt)
+          this.emit('player-join', evt)
+        }
+
         break;
       }
 
       case IncomingPacketType.PositionAndOrientation: {
         if (verifyNetworkSafe(sender)) {
           const data = IncomingPackets.PositionAndOrientation.from(packet)
-  
-          let orientationUpdated = false
+          let orientationNeedsUpdate = false
           if ( ! data.position.isEqualTo(sender.position)) {
             //Update everything at once with a teleport packet
-            orientationUpdated = true
+            orientationNeedsUpdate = true
             sender.world.broadcastNotSelf(sender, OutgoingPackets.SetPositionAndOrientation(sender.entityId, sender))
             sender.orientation = data.orientation
             
             sender.position = data.position
+
+            const evt = new PlayerMovedEvent(sender)
+            sender.world.emit('player-moved',evt)
           }
   
-          if ( (! orientationUpdated) && (! data.orientation.isEqualTo(sender.orientation)) ) {
+          if ( (! orientationNeedsUpdate) && (! data.orientation.isEqualTo(sender.orientation)) ) {
             sender.orientation = data.orientation
             sender.world.broadcastNotSelf(sender, OutgoingPackets.OrientationUpdate(sender.entityId, sender.orientation))
+
+            //TODO: Event for looking around 
           }
+
         }
         break;
       }
 
       case IncomingPacketType.SetBlock: {
-        //TODO: Unlink from default world
-        const data = IncomingPackets.SetBlock.from(packet)
         if (verifyNetworkSafe(sender)) {
-          if (data.placed) {
-            sender.world.setBlockAtMVec3(data.blockId, data.position)
-            sender.world.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
+          const data = IncomingPackets.SetBlock.from(packet)
+          const evt = new SetBlockEvent(sender, data.blockId, data.position, data.placed)
+          sender.world.emit('block-modified', evt)
+          
+
+          if (evt.denied) {
+            sender.sendPacket(OutgoingPackets.SetBlock(evt.position, sender.world.getBlockAtMVec3(evt.position)))
+            break;
+          }
+          if (evt.overridden) {
+            if ( evt.overrideData.position ) {
+              //Position overridden. Therefore, block at original position should be restored no matter what
+              sender.sendPacket(OutgoingPackets.SetBlock(evt.position, sender.world.getBlockAtMVec3(evt.position)))
+            }
+            if ( evt.overrideData.blockId ) {
+              //Block ID changed. Place it at either the override position or event position
+              sender.sendPacket(OutgoingPackets.SetBlock(evt.overrideData.position ?? evt.position, evt.overrideData.blockId))
+            }
           } else {
-            this.defaultWorld.setBlockAtMVec3(Block.Vanilla.Air, data.position)
-            sender.world.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
+            //Proceed like normal
+            if (data.placed) {
+              sender.world.setBlockAtMVec3(data.blockId, data.position)
+              sender.world.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
+            } else {
+              this.defaultWorld.setBlockAtMVec3(Block.Vanilla.Air, data.position)
+              sender.world.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
+            }
           }
         }
         
@@ -277,6 +310,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
           const commandArgs = argv.slice(1)
           const evt = new CommandEvent(sender, commandName, commandArgs )
           this.emit(`command-${commandName}`, evt)
+          sender.world?.emit(`command-${commandName}`, evt)
           console.log(`Consumed command. Fired event "command-${commandName}". ${commandName} ${commandArgs.join(', ')}`)
 
           if (evt.denied) {
@@ -288,6 +322,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
           }
           
         } else {
+          //It's a message. Send it
           this.broadcast(OutgoingPackets.Message(`${sender.username}: ${data.text}`))
         }
         break;

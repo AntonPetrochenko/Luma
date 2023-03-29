@@ -40,10 +40,17 @@ export class UnsafePlayer implements Mobile {
   
   public sendPacket(packet: Buffer): Promise<void> {
     return new Promise((resolve) => {
-      this.socket.write(packet, () => {
-        //TODO: handle packet loss
-        resolve()
-      })
+      const w = () => {
+        this.socket.write(packet, () => {
+          //TODO: handle packet loss
+          resolve()
+        })
+      }
+      if (this.simuLatency > 0) {
+        setTimeout(w, this.simuLatency)
+      } else {
+        w()
+      }
     })
   }
 
@@ -63,7 +70,7 @@ export class UnsafePlayer implements Mobile {
 
   private gameModeStorage = new Map<string, object>()
 
-  
+  public simuLatency = 0
 
   public getStorage(identifier: string, defaultState: () => object) {
     if (this.gameModeStorage.has(identifier)) {

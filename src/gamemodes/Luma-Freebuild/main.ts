@@ -1,7 +1,6 @@
 import { MinecraftClassicServer } from "../../luma/classes/MinecraftClassicServer";
 import { World } from "../../luma/classes/World";
 import { CommandEvent } from "../../luma/events/CommandEvent";
-import { SetBlockEvent } from "../../luma/events/SetBlockEvent";
 import { GameMode, GameModeMeta } from "../../luma/interfaces/GameMode";
 
 export const meta: GameModeMeta = {
@@ -21,9 +20,6 @@ export default class implements GameMode {
           return Block.Vanilla.CyanCloth
       }
       return Block.Vanilla.Air
-    })
-    world.on('setblock', (evt: SetBlockEvent) => {
-      console.log(`Freebuild block ${evt.blockId}} placed!`)
     })
     server.on('command-freebuild', (evt: CommandEvent) => {
       console.log('Command!')

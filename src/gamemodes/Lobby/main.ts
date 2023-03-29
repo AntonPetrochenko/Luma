@@ -23,7 +23,7 @@ export default class implements GameMode {
       }
       return Block.Vanilla.Air
     })
-    world.on('setblock', (evt: SetBlockEvent) => {
+    world.on('block-modified', (evt: SetBlockEvent) => {
       console.log(`Denied block placement for ${evt.player}`)
       evt.deny()
     })
@@ -42,6 +42,10 @@ export default class implements GameMode {
               evt.player.sendPacket(OutgoingPackets.Message(worldName))
             })
           }
+          break;
+        }
+        case ('latency'): {
+          evt.player.simuLatency = parseInt(evt.args[1])
           break;
         }
         default: {

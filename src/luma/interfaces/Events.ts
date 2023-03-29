@@ -7,6 +7,7 @@ import { World } from "../classes/World"
 export interface PlayerInitiatedEvent {
   player: UnsafePlayer 
   deny(): void
+  denied: boolean
 }
 
 export interface WorldEvent {

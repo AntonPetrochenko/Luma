@@ -13,34 +13,23 @@ This project also intends to "backport" some later-game technical features into 
 
 ## Current state of the project
 - Normal 0.30 protocol implemented in full
+- First iteration of the Game Mode system is in place. Requires further work.
 - CPE negotiation is not performed
 - Limited to a single world
 
-Depencencies:
-
-For comamnds, an event system is required (arbitrary decision) 
-For testing multiworld, commands are required
-For multiworld, a proper player manager is required
-For multiworld, config needs to be loaded
-For game modes, an event system is required (arbitrary decision)
-For game modes, multiworld and config is required (arbitrary decision)
-
-Current tasks:
-- Proper multiworld... done, I think? Needs testing
-- Testing multiworld is gonna need an out of order LevelInitialize, which is a CPE thing
-- Therefore, CPE time!
+Ongoing things:
+- CPE time!
 - Events for everything
-- Persistent level storage. Gonna need a custom format for the goodies.
 
 Future important tasks:
-- [ ] Implement ray-casting for CPE PlayerClick
+- [ ] Entities
 
 - CPE implementation:
 None yet
 
 ## Broad scope checklist
 - [x] 0.30 protocol: let there be server software
-- [ ] "Game Mode" system: what makes Luma truly special
+- [x] "Game Mode" system: what makes Luma truly special
 - [ ] CPE support: catching up with the community
 - [ ] Luma Internal Goodies: catching up to speed with Minecraft, in a way
 - [ ] "Luma Freebuild" game mode: what you're used to

@@ -9,7 +9,7 @@ interface SetBlockOverrideData {
 
 export class SetBlockEvent implements PlayerInitiatedEvent {
   public overrideData: SetBlockOverrideData = {}
-  private denied = false
+  public denied = false
   public get status() { return {
     denied: this.denied,
     overridden: this.overridden,
