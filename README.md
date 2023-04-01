@@ -15,7 +15,7 @@ This project also intends to "backport" some later-game technical features into 
 - Normal 0.30 protocol implemented in full
 - First iteration of the Game Mode system is in place. Requires further work.
 - CPE negotiation is not performed
-- Limited to a single world
+- Multiworld
 
 Ongoing things:
 - CPE time!
