@@ -14,11 +14,25 @@ export abstract class EntityBase implements Mobile {
     public velocity: MVec3<BlockFractionUnit>
   ) {}
 
-  private hasGravity = true
-  
+  private hasGravity = true  
 
   public physicsUpdate(dt: number) {
     this.position = this.position.sum(this.velocity.scaled(dt))
+  }
+
+  /** 
+   * Spawn a representation of this entity to the modern cliengs, e.g. ClassiCube. 
+   * For instance, here you can set the entity's custom model 
+   * */
+  public spawnModern(): void {
+    /** */
+  }
+
+  /**
+   * This function is called in place of sending position packets for legacy clients
+   */
+  public representLegacy(): void {
+    /** */
   }
   
 }

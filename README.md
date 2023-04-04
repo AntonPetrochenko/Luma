@@ -13,11 +13,13 @@ This project also intends to "backport" some later-game technical features into 
 
 ## Current state of the project
 - Normal 0.30 protocol implemented in full
+- However, real 0.30 doesn't want to work :(
 - First iteration of the Game Mode system is in place. Requires further work.
 - CPE negotiation is not performed
 - Multiworld
 
 Ongoing things:
+- Entities!
 - CPE time!
 - Events for everything
 
