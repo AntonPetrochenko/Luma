@@ -13,9 +13,7 @@ This project also intends to "backport" some later-game technical features into 
 
 ## Current state of the project
 - Normal 0.30 protocol implemented in full
-- However, real 0.30 doesn't want to work :(
 - First iteration of the Game Mode system is in place. Requires further work.
-- CPE negotiation is not performed
 - Multiworld
 
 Ongoing things:
@@ -27,7 +25,7 @@ Future important tasks:
 - [ ] Entities
 
 - CPE implementation:
-None yet
+Negotiates, pretends to implement EmoteFix, that's it.
 
 ## Broad scope checklist
 - [x] 0.30 protocol: let there be server software
