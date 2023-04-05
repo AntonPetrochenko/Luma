@@ -4,6 +4,7 @@ import { Orientation } from "../util/Vectors/Orientation";
 import { Mobile } from "./Entity/EntityBase";
 import { MinecraftClassicServer } from "./MinecraftClassicServer";
 import { World } from "./World";
+import { CPE_ExtEntry } from "../packet_wrappers/IncomingPackets";
 
 
 
@@ -35,7 +36,6 @@ export interface WorldSafePlayer extends UnsafePlayer {
   connected: true
 }
 
-
 export class UnsafePlayer implements Mobile {
   
   public sendPacket(packet: Buffer): Promise<void> {
@@ -54,6 +54,7 @@ export class UnsafePlayer implements Mobile {
     })
   }
 
+  public partialPacketBuffer: Buffer | undefined
 
   public handleClose = true
   public connected = true
@@ -71,6 +72,9 @@ export class UnsafePlayer implements Mobile {
   private gameModeStorage = new Map<string, object>()
 
   public simuLatency = 0
+  public extensionCount = 0
+
+  public CPESupport: CPE_ExtEntry[] = [];
 
   public getStorage(identifier: string, defaultState: () => object) {
     if (this.gameModeStorage.has(identifier)) {

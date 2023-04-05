@@ -115,3 +115,23 @@ export function Message(text: string) {
 export function Ping() {
   return pack('>B', [0x01])
 }
+
+export function CPE_ExtInfo(extensionCount: number) {
+  const a = pack('>B64sH',[
+    0x10,
+    'Luma',
+    extensionCount
+  ])
+  console.log(dumpBufferToString(a))
+  return a
+}
+
+export function CPE_ExtEntry(name: string, version: number) {
+  const a = pack('>B64si', [ 
+    0x11, 
+    name, 
+    version
+  ])
+  console.log(dumpBufferToString(a))
+  return a
+}

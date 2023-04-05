@@ -11,7 +11,6 @@
  */
 
 import * as Net from 'net'
-import IncomingPacketType from '../enums/IncomingPacketType'
 import '../enums/MinecraftBlockID'
 import { dumpBufferToString } from '../util/Helpers/HexDumper'
 import { UnsafePlayer, verifyNetworkSafe, verifyWorldSafe } from './ServerPlayer'
@@ -28,6 +27,7 @@ import { CommandEvent } from '../events/CommandEvent'
 import { PlayerJoinEvent } from '../events/PlayerJoinEvent'
 import { PlayerMovedEvent } from '../events/PlayerMovedEvent'
 import { SetBlockEvent } from '../events/SetBlockEvent'
+import { WriteStream, createWriteStream } from 'fs'
 
 const defaultConfig =
   {
@@ -45,6 +45,14 @@ const defaultConfig =
       }
     }
   }
+
+const packetLengthLookupTable: number[] = []
+
+//TODO: This is dumb and stupid and dumb. Undo this, find a better solution
+Object.values(IncomingPackets).forEach( (classDef) => {
+  packetLengthLookupTable[classDef.id] = classDef.bytes
+})
+
 export class MinecraftClassicServer extends EventEmitter { //extending EventEmitter is a surprise tool that'll help us later
   private server: Net.Server
   public config: Config<typeof defaultConfig>
@@ -54,6 +62,13 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
   public readonly defaultWorld: World;
 
   public worlds: Map<string, World> = new Map()
+
+  public extensionSupport = [
+    { name: 'EmoteFix', version: 1 },
+  ]
+
+  private demoRecordMode = false
+  private demoFile: WriteStream | undefined
   
   private constructor(config: Config<typeof defaultConfig>, gamemodes: Map<string, GameModeModule>) {
     super()
@@ -61,22 +76,69 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
     
     
     //Create TCP server
-    this.server = Net.createServer((clientSocket) => {
-      clientSocket.setNoDelay(true)
-
+    if (this.demoRecordMode) {
+      this.demoFile = createWriteStream('./demo.bin')
+    }
+    this.server = Net.createServer((clientSocket: Socket) => {
       
       const joinedPlayer = new UnsafePlayer(clientSocket, this.defaultWorld)
       this.players.add(joinedPlayer)
 
-      const pingInterval = setInterval(() => {
-          clientSocket.write(OutgoingPackets.Ping())
-      },100)
-      clientSocket.on('data', (incomingBuffer) => {
-        this.handlePacket(incomingBuffer, clientSocket)
+      clientSocket.on('data', (dataBuffer) => {
+        if (this.demoFile) {
+          this.demoFile.write(dataBuffer)
+        }
+        //One of two things may happen here.
+        //One, we're in our normal state where we just read packets and handle them
+        //Other, we're in the state where just got a partial packet and to glue more data on it
+        let packetBuffer
+        if (joinedPlayer.partialPacketBuffer) {
+          packetBuffer = Buffer.concat([joinedPlayer.partialPacketBuffer, dataBuffer])
+          joinedPlayer.partialPacketBuffer = undefined
+        } else {
+          packetBuffer = dataBuffer
+        }
+
+        //Parse incoming data
+        const recvdPackets: {buffer: Buffer, expectedLength: number}[] = []
+        let cursor = 0
+        while (cursor < packetBuffer.length) {
+          //The first byte we encounter is definitely a packetId
+          const packetId = packetBuffer[cursor]
+          const packetLength = packetLengthLookupTable[packetId]
+          if (packetLength) {
+            //This handles reads after buffer length, so we're safe
+            //In case we get a partial packet at the end of the incomingBuffer,
+            //we'll just get a Buffer instance that is shorter than expected
+            const foundPacket = packetBuffer.subarray( cursor, cursor + packetLength )
+            recvdPackets.push({
+              buffer: foundPacket,
+              expectedLength: packetLength //Store expected length for a check down the line
+            })
+            cursor += packetLength
+          } else {
+            //Can't check length of a packet we don't know
+            console.error(`We got a bad packet ${packetId}`)
+            clientSocket.write(OutgoingPackets.Message(`&cYour client had sent a bad packet ${packetId}`))
+            clientSocket.write(OutgoingPackets.Message(`&cIf you see this message, you've probably desynced. :(`))
+            return
+          }
+        }
+
+        recvdPackets.forEach( (packetInfo) => {
+          if (packetInfo.buffer.length == packetInfo.expectedLength) {
+            //We're safe, handle
+            this.handlePacket(packetInfo.buffer, clientSocket)
+          } else {
+            //This should only really happen to the last packet in the array
+            //Partial packet, Use it as basis for the next recv
+            joinedPlayer.partialPacketBuffer = packetInfo.buffer
+          }
+        })
       })
 
       const disconnect = (reason = '') => {
-        clearInterval(pingInterval)
+        // clearInterval(pingInterval)
         const player = this.findPlayerBySocket(clientSocket)
         if (verifyNetworkSafe(player)) {
           player.world.unbindPlayer(player)
@@ -216,29 +278,46 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
     return loadedGameModes
   }
 
+  private async finishHandshake(sender: UnsafePlayer) {
+    sender.sendPacket(OutgoingPackets.ServerIdentification(this.config.settings.name, this.config.settings.motd, true)) 
+    await sender.sendToWorld(this.defaultWorld)
+
+    if (verifyWorldSafe(sender, this.defaultWorld)) {
+      const evt = new PlayerJoinEvent(sender)
+      this.defaultWorld.emit('player-join', evt)
+      this.emit('player-join', evt)
+    }
+  }
   private async handlePacket(packet: Buffer, clientSocket: Socket): Promise<void> {
     
     const packetID = this.identifyIncomingPacket(packet)
     const sender = this.findPlayerBySocket(clientSocket)
 
     switch (packetID) {
-      case IncomingPacketType.PlayerIdentification: {
+      case IncomingPackets.PlayerIdentification.id: {
         const data = IncomingPackets.PlayerIdentification.from(packet)
-        sender.sendPacket(OutgoingPackets.ServerIdentification(this.config.settings.name, this.config.settings.motd, true)) 
-
         sender.username = data.username
-        sender.sendToWorld(this.defaultWorld)
+        
 
-        if (verifyWorldSafe(sender, this.defaultWorld)) {
-          const evt = new PlayerJoinEvent(sender)
-          this.defaultWorld.emit('player-join', evt)
-          this.emit('player-join', evt)
+        if (data.wantsCPE) {
+          //Not a drill! This player wants CLASSIC PROTOCOL EXTENSIONS!
+          //Gotta let them know we speak that too!
+          console.log(`CPE Handshake for ${sender.username}`)
+          sender.sendPacket(OutgoingPackets.CPE_ExtInfo(this.extensionSupport.length))
+          for (const extension of this.extensionSupport) {
+            sender.sendPacket(OutgoingPackets.CPE_ExtEntry(extension.name, extension.version))
+          }
+          //Now hold your horses! We are NOT proceeding to the rest of the init!
+          //It is now continued in CPE_ExtInfo and CPE_ExtEntry handlers
+          // await this.finishHandshake(sender)
+        } else {
+          //Otherwise, finish init. 
+          await this.finishHandshake(sender)
         }
-
         break;
       }
 
-      case IncomingPacketType.PositionAndOrientation: {
+      case IncomingPackets.PositionAndOrientation.id: {
         if (verifyNetworkSafe(sender)) {
           const data = IncomingPackets.PositionAndOrientation.from(packet)
           let orientationNeedsUpdate = false
@@ -265,7 +344,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
         break;
       }
 
-      case IncomingPacketType.SetBlock: {
+      case IncomingPackets.SetBlock.id: {
         if (verifyNetworkSafe(sender)) {
           const data = IncomingPackets.SetBlock.from(packet)
           const evt = new SetBlockEvent(sender, data.blockId, data.position, data.placed)
@@ -291,7 +370,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
               sender.world.setBlockAtMVec3(data.blockId, data.position)
               sender.world.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
             } else {
-              this.defaultWorld.setBlockAtMVec3(Block.Vanilla.Air, data.position)
+              sender.world.setBlockAtMVec3(Block.Vanilla.Air, data.position)
               sender.world.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
             }
           }
@@ -300,7 +379,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
         break;
       }
 
-      case IncomingPacketType.Message: {
+      case IncomingPackets.Message.id: {
         const data = IncomingPackets.Message.from(packet)
         //Recognize whether or not the message is a command
         if (data.text.match(/^\//)) {
@@ -328,8 +407,31 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
         break;
       }
 
+      case (IncomingPackets.CPE_ExtInfo.id): {
+        const data = IncomingPackets.CPE_ExtInfo.from(packet)
+        console.log(`${sender.username} is running ${data.appName} with ${data.extensionCount} mods`)
+        //We ballin!
+        sender.extensionCount = data.extensionCount
+        break;
+      }
+
+      case (IncomingPackets.CPE_ExtEntry.id): {
+        const data = IncomingPackets.CPE_ExtEntry.from(packet)
+        console.log(`${sender.username} supports ${data.extName} version ${data.version}`)
+        sender.CPESupport.push(data)
+        console.log(`Caught ${sender.CPESupport.length} extensions`)
+
+        //Was this the last one? If so, continue handshake...
+        if (sender.CPESupport.length == sender.extensionCount) {
+          console.log('Done handshaking!')
+          console.log(sender.CPESupport)
+          this.finishHandshake(sender)
+        }
+        break;
+      }
+
       default: 
-        console.log(`Received unknown packet ${packetID.toString(16)} ${dumpBufferToString(packet)}`)
+        throw new Error('Handled unknown packet. This can no longer happen. You win!')
         break;
     }
   }

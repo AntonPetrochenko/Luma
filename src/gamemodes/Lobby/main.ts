@@ -1,9 +1,12 @@
+import { Socket } from "net";
 import { MinecraftClassicServer } from "../../luma/classes/MinecraftClassicServer";
 import { World } from "../../luma/classes/World";
 import { CommandEvent } from "../../luma/events/CommandEvent";
 import { SetBlockEvent } from "../../luma/events/SetBlockEvent";
 import { GameMode, GameModeMeta } from "../../luma/interfaces/GameMode";
 import * as OutgoingPackets from '../../luma/packet_wrappers/OutgoingPackets'
+import { createReadStream } from "fs";
+import { dumpBufferToString } from "../../luma/util/Helpers/HexDumper";
 
 export const meta: GameModeMeta = {
   identifier: 'luma-lobby',
@@ -23,10 +26,10 @@ export default class implements GameMode {
       }
       return Block.Vanilla.Air
     })
-    world.on('block-modified', (evt: SetBlockEvent) => {
-      console.log(`Denied block placement for ${evt.player}`)
-      evt.deny()
-    })
+    // world.on('block-modified', (evt: SetBlockEvent) => {
+    //   console.log(`Denied block placement for ${evt.player}`)
+    //   evt.deny()
+    // })
     server.on('command-lobby', (evt: CommandEvent) => {
       evt.deny(`Lobby gamemode handled a command! Params: ${evt.args.join(', ')}`)
     })
@@ -46,6 +49,32 @@ export default class implements GameMode {
         }
         case ('latency'): {
           evt.player.simuLatency = parseInt(evt.args[1])
+          break;
+        }
+        case ('broken-packet-test'): {
+          evt.player.sendPacket(OutgoingPackets.Message('Stress testing...'))
+          const sock = new Socket()
+          sock.connect(9999, 'localhost', () => {
+            evt.player.sendPacket(OutgoingPackets.Message('Connected'))
+            const demoFile = createReadStream('./demo.bin')
+            demoFile.on('readable', () => {
+              const lolInterval = setInterval(() => {
+                const len = 1 + Math.floor(Math.random()*100)
+                const bytes = demoFile.read(len)
+                evt.player.sendPacket(OutgoingPackets.Message(`Read ${len}`))
+                if (bytes) {
+                  evt.player.sendPacket(OutgoingPackets.Message(`Writing`))
+                  dumpBufferToString(bytes)
+                  sock.write(bytes)
+                } else {
+                  evt.player.sendPacket(OutgoingPackets.Message('Done'))
+                  clearInterval(lolInterval)
+                  demoFile.close()
+                  sock.end()
+                }
+              }, 100)
+            })
+          })
           break;
         }
         default: {
