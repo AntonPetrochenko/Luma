@@ -7,11 +7,15 @@ type MinecraftLengthUnit = BlockUnit | BlockFractionUnit
 
 /** A vec3 in Minecraft space. Immutable, methods return new MVec3. */
 export class MVec3<NumberType extends MinecraftLengthUnit> {
+
+  public readonly identity: string  
   constructor(
     public internalX: NumberType,
     public internalY: NumberType,
     public internalZ: NumberType
-  ) {}
+  ) {
+    this.identity = `${this.internalX} ${this.internalY} ${this.internalZ}`
+  }
 
   //As far as Minecraft is concerned, these are integers. Let's treat them appropriately.
   //We'll see how well this design decision goes

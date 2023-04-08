@@ -75,6 +75,7 @@ export class UnsafePlayer implements Mobile {
   public extensionCount = 0
 
   public CPESupport: CPE_ExtEntry[] = [];
+  public CPESkipped: CPE_ExtEntry[] = [];
 
   public getStorage(identifier: string, defaultState: () => object) {
     if (this.gameModeStorage.has(identifier)) {
@@ -102,6 +103,12 @@ export class UnsafePlayer implements Mobile {
     const newId: number = await targetWorld.bindPlayer(this)
     console.log(`Bound new player to world, id ${newId}`)
 
+  }
+
+  public supports(extName: string, version = 1): boolean | CPE_ExtEntry {
+    return !! this.CPESupport.find( (supportedEntry) => {
+      return supportedEntry.extName == extName && supportedEntry.version == version
+    } )
   }
   
   

@@ -2,11 +2,13 @@ import { Socket } from "net";
 import { MinecraftClassicServer } from "../../luma/classes/MinecraftClassicServer";
 import { World } from "../../luma/classes/World";
 import { CommandEvent } from "../../luma/events/CommandEvent";
-import { SetBlockEvent } from "../../luma/events/SetBlockEvent";
 import { GameMode, GameModeMeta } from "../../luma/interfaces/GameMode";
 import * as OutgoingPackets from '../../luma/packet_wrappers/OutgoingPackets'
 import { createReadStream } from "fs";
 import { dumpBufferToString } from "../../luma/util/Helpers/HexDumper";
+import { TickEvent } from "../../luma/events/TickEvent";
+import { randInt } from "../../luma/util/Helpers/RandInt";
+import { BlockUnit, MVec3 } from "../../luma/util/Vectors/MVec3";
 
 export const meta: GameModeMeta = {
   identifier: 'luma-lobby',
@@ -30,6 +32,37 @@ export default class implements GameMode {
     //   console.log(`Denied block placement for ${evt.player}`)
     //   evt.deny()
     // })
+
+    world.on('tick', () => {
+      // console.log('ticked')
+      for (let i=0; i<64; i++) {
+        const pos = new MVec3<BlockUnit>(
+          randInt(world.sizeX) as BlockUnit,
+          randInt(world.sizeY) as BlockUnit,
+          randInt(world.sizeZ) as BlockUnit
+        )
+
+        const b = world.getBlockAtMVec3(pos)
+        if (b == Block.Vanilla.Wood) {
+          world.setBlockAtMVec3(
+            Block.Vanilla.Wood,
+            pos.sum(new MVec3<BlockUnit>(
+              0 as BlockUnit,
+              1 as BlockUnit,
+              0 as BlockUnit
+            ))
+          )
+        } else {
+          if (b != Block.Vanilla.Air) {
+            world.setBlockAtMVec3(
+              Block.Vanilla.Dirt,
+              pos
+            ) 
+          }
+        }
+      }
+    })
+
     server.on('command-lobby', (evt: CommandEvent) => {
       evt.deny(`Lobby gamemode handled a command! Params: ${evt.args.join(', ')}`)
     })

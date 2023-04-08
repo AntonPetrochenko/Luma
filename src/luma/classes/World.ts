@@ -8,6 +8,8 @@ import { EntityBase } from "./Entity/EntityBase";
 import { UnsafePlayer, WorldSafePlayer  } from "./ServerPlayer";
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
 import { WorldJoinProcedure } from "../packet_wrappers/ComplexProcedures";
+import { PositionedBlockMap } from "../data_structures/BlockCollection";
+import { TickEvent } from "../events/TickEvent";
 
 interface WorldOptions {
   sizeX?: number,
@@ -16,6 +18,10 @@ interface WorldOptions {
 }
 
 type SimpleWorldgenCallback = (x: number, y: number, z: number, sizeX: number, sizeY: number, sizeZ: number) => number
+
+interface TickInfo {
+  updatedBlocks: PositionedBlockMap,
+}
 
 export class World extends EventEmitter {
 
@@ -26,6 +32,8 @@ export class World extends EventEmitter {
   private gamemode: GameMode | undefined
 
   private idTracker = new EntityIdTracker(128)
+
+  private blockUpdatesThisTick = new PositionedBlockMap()
 
   public async bindPlayer(boundPlayer: UnsafePlayer) {
     //Deliberately letting next line crash. Game modes are gonna need to set up player and entity limits on their own
@@ -50,6 +58,16 @@ export class World extends EventEmitter {
       this.broadcast(OutgoingPackets.Message(`&b${player.username} left the world`))
   }
 
+  public tick(dt: number): TickInfo {
+    this.emit('tick', new TickEvent(dt))
+
+    const previousUpdates = this.blockUpdatesThisTick
+    this.blockUpdatesThisTick = new PositionedBlockMap()
+    return {
+      updatedBlocks: previousUpdates
+    }
+  }
+
   private blockIndex(x: number, y: number, z: number) {
     //height is Y
     //width is X
@@ -65,11 +83,13 @@ export class World extends EventEmitter {
     return this.blocks[this.blockIndex(position.x, position.y, position.z)]
   }
 
-  public setBlockAtPos(blockID: number, x: number, y: number, z: number) {
+  private setBlockInternal(blockID: number, x: number, y: number, z: number) {
     this.blocks[this.blockIndex(x,y,z)] = blockID
   }
+
   public setBlockAtMVec3(blockID: number, position: MVec3<BlockUnit>) {
     this.blocks[this.blockIndex(position.x, position.y, position.z)] = blockID
+    this.blockUpdatesThisTick.setBlock(position, blockID)
   }
 
   /**
@@ -79,7 +99,7 @@ export class World extends EventEmitter {
     for (let xPos = 0; xPos < this.sizeX; xPos++) {
       for (let yPos = 0; yPos < this.sizeY; yPos++) {
         for (let zPos = 0; zPos < this.sizeZ; zPos++) {
-          this.setBlockAtPos(cb(xPos, yPos, zPos, this.sizeX, this.sizeY, this.sizeZ), xPos, yPos, zPos)
+          this.setBlockInternal(cb(xPos, yPos, zPos, this.sizeX, this.sizeY, this.sizeZ), xPos, yPos, zPos)
         }
       }  
     }

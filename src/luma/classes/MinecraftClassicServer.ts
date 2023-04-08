@@ -12,6 +12,7 @@
 
 import * as Net from 'net'
 import '../enums/MinecraftBlockID'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { dumpBufferToString } from '../util/Helpers/HexDumper'
 import { UnsafePlayer, verifyNetworkSafe, verifyWorldSafe } from './ServerPlayer'
 import { World } from './World'
@@ -34,6 +35,7 @@ const defaultConfig =
     name: 'Unnamed server',
     motd: 'Nothing to say about this server',
     defaultWorld: 'lobby',
+    tickInterval: 1000/20,
     worlds: {
       lobby: {
         gamemode: 'luma-lobby',
@@ -64,11 +66,13 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
   public worlds: Map<string, World> = new Map()
 
   public extensionSupport = [
-    { name: 'EmoteFix', version: 1 },
+    { extName: 'EmoteFix', version: 1 },
   ]
 
   private demoRecordMode = false
   private demoFile: WriteStream | undefined
+
+  private worldTickingInterval: NodeJS.Timer | undefined
   
   private constructor(config: Config<typeof defaultConfig>, gamemodes: Map<string, GameModeModule>) {
     super()
@@ -197,7 +201,27 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
     }
     this.defaultWorld = worldToSetAsDefault
     
+    //Start ticking worlds
+    //TODO: Use delta time
+    this.worldTickingInterval = setInterval(this.worldTick.bind(this), this.config.settings.tickInterval)
 
+  }
+
+  private worldTick() {
+    this.worlds.forEach( (world) => {
+      //TODO: Use delta time
+      const worldTickInfo = world.tick(this.config.settings.tickInterval)
+      world.players.forEach( player => {
+        if (player.supports('BulkBlockUpdate')) {
+          //Brew BulkBlockUpdate packets
+          throw new Error('Unimplemented...')
+        } else {
+          worldTickInfo.updatedBlocks.forEach( (update) => {
+            player.sendPacket(OutgoingPackets.SetBlock(update.position, update.blockId))
+          })
+        }
+      })
+    })
   }
 
   tryFindPlayerBySocket(socket: Socket) {
@@ -305,7 +329,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
           console.log(`CPE Handshake for ${sender.username}`)
           sender.sendPacket(OutgoingPackets.CPE_ExtInfo(this.extensionSupport.length))
           for (const extension of this.extensionSupport) {
-            sender.sendPacket(OutgoingPackets.CPE_ExtEntry(extension.name, extension.version))
+            sender.sendPacket(OutgoingPackets.CPE_ExtEntry(extension.extName, extension.version))
           }
           //Now hold your horses! We are NOT proceeding to the rest of the init!
           //It is now continued in CPE_ExtInfo and CPE_ExtEntry handlers
@@ -368,10 +392,10 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
             //Proceed like normal
             if (data.placed) {
               sender.world.setBlockAtMVec3(data.blockId, data.position)
-              sender.world.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
+              // sender.world.broadcast(OutgoingPackets.SetBlock(data.position, data.blockId))
             } else {
               sender.world.setBlockAtMVec3(Block.Vanilla.Air, data.position)
-              sender.world.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
+              // sender.world.broadcast(OutgoingPackets.SetBlock(data.position, Block.Vanilla.Air))
             }
           }
         }
@@ -418,11 +442,20 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       case (IncomingPackets.CPE_ExtEntry.id): {
         const data = IncomingPackets.CPE_ExtEntry.from(packet)
         console.log(`${sender.username} supports ${data.extName} version ${data.version}`)
-        sender.CPESupport.push(data)
-        console.log(`Caught ${sender.CPESupport.length} extensions`)
+        
+        if (this.extensionSupport.find((entry) => {
+          return entry.extName == data.extName && entry.version == data.version
+        })) {
+          sender.CPESupport.push(data)
+          console.log(`Caught ${sender.CPESupport.length} extensions`)
+        } else {
+          sender.CPESkipped.push(data)
+          console.log(`Skipped ${sender.CPESupport.length} extensions`)
+        }
+        
 
         //Was this the last one? If so, continue handshake...
-        if (sender.CPESupport.length == sender.extensionCount) {
+        if ((sender.CPESupport.length + sender.CPESkipped.length ) == sender.extensionCount) {
           console.log('Done handshaking!')
           console.log(sender.CPESupport)
           this.finishHandshake(sender)
