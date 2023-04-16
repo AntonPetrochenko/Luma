@@ -29,6 +29,7 @@ import { PlayerJoinEvent } from '../events/PlayerJoinEvent'
 import { PlayerMovedEvent } from '../events/PlayerMovedEvent'
 import { SetBlockEvent } from '../events/SetBlockEvent'
 import { WriteStream, createWriteStream } from 'fs'
+import { LumaCPESupportInfo } from '../cpe_modules/CPE'
 
 const defaultConfig =
   {
@@ -57,6 +58,9 @@ Object.values(IncomingPackets).forEach( (classDef) => {
 
 export class MinecraftClassicServer extends EventEmitter { //extending EventEmitter is a surprise tool that'll help us later
   private server: Net.Server
+
+  public extensionSupport = LumaCPESupportInfo
+
   public config: Config<typeof defaultConfig>
 
   private players = new Set<UnsafePlayer | UnsafePlayer>
@@ -64,10 +68,6 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
   public readonly defaultWorld: World;
 
   public worlds: Map<string, World> = new Map()
-
-  public extensionSupport = [
-    { extName: 'EmoteFix', version: 1 },
-  ]
 
   private demoRecordMode = false
   private demoFile: WriteStream | undefined
@@ -122,7 +122,8 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
             cursor += packetLength
           } else {
             //Can't check length of a packet we don't know
-            console.error(`We got a bad packet ${packetId}`)
+            console.error(`We got a bad packet ${packetId} from ${joinedPlayer.username}`)
+            console.error(dumpBufferToString(packetBuffer))
             clientSocket.write(OutgoingPackets.Message(`&cYour client had sent a bad packet ${packetId}`))
             clientSocket.write(OutgoingPackets.Message(`&cIf you see this message, you've probably desynced. :(`))
             return
@@ -443,14 +444,19 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
         const data = IncomingPackets.CPE_ExtEntry.from(packet)
         console.log(`${sender.username} supports ${data.extName} version ${data.version}`)
         
-        if (this.extensionSupport.find((entry) => {
+        const supportedEntry = this.extensionSupport.find((entry) => {
           return entry.extName == data.extName && entry.version == data.version
-        })) {
-          sender.CPESupport.push(data)
+        })
+
+        if (supportedEntry) {
+          sender.CPESupport.push(supportedEntry)
+          if (supportedEntry.mod && supportedEntry.mod.hydrate) {
+            supportedEntry.mod.hydrate(sender)
+          }
           console.log(`Caught ${sender.CPESupport.length} extensions`)
         } else {
           sender.CPESkipped.push(data)
-          console.log(`Skipped ${sender.CPESupport.length} extensions`)
+          console.log(`Skipped ${sender.CPESkipped.length} extensions`)
         }
         
 

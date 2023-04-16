@@ -9,6 +9,9 @@ import { dumpBufferToString } from "../../luma/util/Helpers/HexDumper";
 import { TickEvent } from "../../luma/events/TickEvent";
 import { randInt } from "../../luma/util/Helpers/RandInt";
 import { BlockUnit, MVec3 } from "../../luma/util/Vectors/MVec3";
+import { MessageType, Mod_MessageTypes } from "../../luma/cpe_modules/MessageType";
+import { UnsafePlayer } from "../../luma/classes/ServerPlayer";
+import { BlockTickEvent } from "../../luma/events/BlockTickEvent";
 
 export const meta: GameModeMeta = {
   identifier: 'luma-lobby',
@@ -19,6 +22,7 @@ export const meta: GameModeMeta = {
 export default class implements GameMode {
   setup(world: World, server: MinecraftClassicServer) {
     world.generateSimple((x, y, z, sx, sy) => {
+      if (x==z) return Block.Vanilla.Glass
       const waterLevel = sy/2
       if (y<waterLevel) {
         return Block.Vanilla.Stone
@@ -34,31 +38,31 @@ export default class implements GameMode {
     // })
 
     world.on('tick', () => {
-      // console.log('ticked')
-      for (let i=0; i<64; i++) {
-        const pos = new MVec3<BlockUnit>(
-          randInt(world.sizeX) as BlockUnit,
-          randInt(world.sizeY) as BlockUnit,
-          randInt(world.sizeZ) as BlockUnit
-        )
+    // console.log('ticked')
+      const pos = new MVec3<BlockUnit>(
+        randInt(world.sizeX) as BlockUnit,
+        randInt(world.sizeY) as BlockUnit,
+        randInt(world.sizeZ) as BlockUnit
+      )
 
-        const b = world.getBlockAtMVec3(pos)
-        if (b == Block.Vanilla.Wood) {
+      const b = world.getBlockAtMVec3(pos)
+        if (b != Block.Vanilla.Air) {
           world.setBlockAtMVec3(
-            Block.Vanilla.Wood,
-            pos.sum(new MVec3<BlockUnit>(
-              0 as BlockUnit,
-              1 as BlockUnit,
-              0 as BlockUnit
-            ))
-          )
-        } else {
-          if (b != Block.Vanilla.Air) {
-            world.setBlockAtMVec3(
-              Block.Vanilla.Dirt,
-              pos
-            ) 
-          }
+            Block.Vanilla.Dirt,
+            pos
+          ) 
+        }
+    })
+
+    world.on('block-tick', (evt: BlockTickEvent) => {
+      switch (evt.blockId) {
+        case Block.Vanilla.Wood: {
+          world.setBlockAtMVec3(Block.Vanilla.Wood, evt.position.offset(0,1,0)) 
+          break;
+        }
+        case Block.Vanilla.GrassBlock: {
+          world.setBlockAtMVec3(Block.Vanilla.Glass, evt.position) 
+          break;
         }
       }
     })
@@ -108,6 +112,12 @@ export default class implements GameMode {
               }, 100)
             })
           })
+          break;
+        }
+        case ('announce'): {
+          if (Mod_MessageTypes.supportedBy(evt.player)) {
+            evt.player.CPE.sendTypedMessage(MessageType.Announcement, evt.args[1])
+          }
           break;
         }
         default: {

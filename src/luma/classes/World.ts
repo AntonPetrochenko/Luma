@@ -10,6 +10,8 @@ import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
 import { WorldJoinProcedure } from "../packet_wrappers/ComplexProcedures";
 import { PositionedBlockMap } from "../data_structures/BlockCollection";
 import { TickEvent } from "../events/TickEvent";
+import { BlockTickEvent } from "../events/BlockTickEvent";
+import { randInt } from "../util/Helpers/RandInt";
 
 interface WorldOptions {
   sizeX?: number,
@@ -30,6 +32,8 @@ export class World extends EventEmitter {
   public players = new Set<UnsafePlayer>()
   public entities = new Set<EntityBase>()
   private gamemode: GameMode | undefined
+
+  public tickPerChunk = 10;
 
   private idTracker = new EntityIdTracker(128)
 
@@ -59,7 +63,30 @@ export class World extends EventEmitter {
   }
 
   public tick(dt: number): TickInfo {
+    //Emit global tick
     this.emit('tick', new TickEvent(dt))
+    //Emit dedicated block tick events
+    for (let xPos = 0; xPos < this.sizeX; xPos+=16) {
+      for (let yPos = 0; yPos < this.sizeY; yPos+=16) {
+        for (let zPos = 0; zPos < this.sizeZ; zPos+=16) {
+
+          const tickPosition = new MVec3<BlockUnit>(
+            (xPos + randInt(16)) as BlockUnit,
+            (yPos + randInt(16)) as BlockUnit,
+            (zPos + randInt(16)) as BlockUnit
+          )
+
+          if (tickPosition.boundedBy(
+            MVec3.zeroBlock,
+            this.sizeMVec3
+          )) {
+            const blockId = this.getBlockAtMVec3(tickPosition)
+  
+            this.emit('block-tick', new BlockTickEvent(tickPosition, blockId))
+          }
+        }
+      }  
+    }
 
     const previousUpdates = this.blockUpdatesThisTick
     this.blockUpdatesThisTick = new PositionedBlockMap()
@@ -73,14 +100,22 @@ export class World extends EventEmitter {
     //width is X
     //depth is Z
     //XZY order (thanks, notch!)
-    return this.sizeY*this.sizeX*z + this.sizeX*y + x
+    return this.sizeY*this.sizeX*y + this.sizeX*z + x
   }
 
-  public getBlockAtPos(x: number, y: number, z: number): number {
+  private getBlockInternal(x: number, y: number, z: number): number {
     return this.blocks[this.blockIndex(x,y,z)]
   }
   public getBlockAtMVec3(position: MVec3<BlockUnit>): number {
-    return this.blocks[this.blockIndex(position.x, position.y, position.z)]
+    if (
+      position.x >= 0 && position.x < this.sizeX,
+      position.y >= 0 && position.y < this.sizeY,
+      position.z >= 0 && position.x < this.sizeZ
+    ) {
+      return this.blocks[this.blockIndex(position.x, position.y, position.z)]
+    } else {
+      return Block.Vanilla.Bedrock
+    }
   }
 
   private setBlockInternal(blockID: number, x: number, y: number, z: number) {
@@ -88,8 +123,14 @@ export class World extends EventEmitter {
   }
 
   public setBlockAtMVec3(blockID: number, position: MVec3<BlockUnit>) {
-    this.blocks[this.blockIndex(position.x, position.y, position.z)] = blockID
-    this.blockUpdatesThisTick.setBlock(position, blockID)
+    if (
+      position.x >= 0 && position.x < this.sizeX,
+      position.y >= 0 && position.y < this.sizeY,
+      position.z >= 0 && position.x < this.sizeZ
+    ) {
+      this.blocks[this.blockIndex(position.x, position.y, position.z)] = blockID
+      this.blockUpdatesThisTick.setBlock(position, blockID)
+    }
   }
 
   /**
@@ -119,7 +160,7 @@ export class World extends EventEmitter {
     for (let yPos = 0; yPos < this.sizeY; yPos++) {
       for (let zPos = 0; zPos < this.sizeZ; zPos++) {
         for (let xPos = 0; xPos < this.sizeX; xPos++) {
-          values.push(this.getBlockAtPos(xPos, yPos, zPos))
+          values.push(this.getBlockInternal(xPos, yPos, zPos))
         }
       }
     }
@@ -142,6 +183,8 @@ export class World extends EventEmitter {
   public readonly sizeZ: number;
   public readonly volume: number;
 
+  public readonly sizeMVec3: MVec3<BlockUnit>
+
   public spawnPoint: MVec3<BlockFractionUnit>
 
   constructor(options: WorldOptions) {
@@ -151,6 +194,11 @@ export class World extends EventEmitter {
     this.sizeY = options.sizeY || 64
     this.sizeZ = options.sizeZ || 64
     
+    this.sizeMVec3 = new MVec3<BlockUnit>(
+      this.sizeX as BlockUnit,
+      this.sizeY as BlockUnit,
+      this.sizeZ as BlockUnit
+    )
 
     this.spawnPoint = new MVec3<BlockFractionUnit>(16*32 as BlockFractionUnit, 16*32 as BlockFractionUnit, 16*32 as BlockFractionUnit)
 

@@ -5,7 +5,7 @@ export type BlockFractionUnit = Nominal<number, 'BlockFractionUnit'>
 
 type MinecraftLengthUnit = BlockUnit | BlockFractionUnit
 
-/** A vec3 in Minecraft space. Immutable, methods return new MVec3. */
+/** A nominally typed vec3 in Minecraft space. Immutable, methods return new MVec3. */
 export class MVec3<NumberType extends MinecraftLengthUnit> {
 
   public readonly identity: string  
@@ -30,9 +30,17 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
 
   sum(other: MVec3<NumberType>) {
     return new MVec3<NumberType> (
-      this.internalX + other.internalX as NumberType,
-      this.internalY + other.internalY as NumberType,
-      this.internalZ + other.internalZ as NumberType,
+      this.internalX + other.internalX as NumberType, // i know "as NumberType" doesn't really make sense here
+      this.internalY + other.internalY as NumberType, // but we're dealing with make-believe nominal types in ts
+      this.internalZ + other.internalZ as NumberType, // so this is kind of required
+    )
+  }
+
+  offset(x: number,y: number,z: number) {
+    return new MVec3<NumberType>(
+      this.internalX + x as NumberType,
+      this.internalY + y as NumberType,
+      this.internalZ + z as NumberType
     )
   }
 
@@ -46,9 +54,9 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
 
   scaled(scale: number) {
     return new MVec3<NumberType> (
-      this.internalX * scale as NumberType, // i know "as TypedNumber" doesn't really make sense here
-      this.internalY * scale as NumberType, // but we're dealing with make-believe nominal types in ts
-      this.internalZ * scale as NumberType  // so this is kind of required
+      this.internalX * scale as NumberType, 
+      this.internalY * scale as NumberType, 
+      this.internalZ * scale as NumberType  
     )
   }
 
@@ -71,6 +79,20 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
       this.x == other.x && this.y == other.y && this.z == other.z
     )
   }
+
+  /** 
+   * Whether or not this MVec3 lands within the bounds created by a pair of other MVec3 
+   * */
+  public boundedBy(start: MVec3<NumberType>, end: MVec3<NumberType>) {
+    return (
+      this.internalX >= start.internalX && this.internalX <= end.internalX &&
+      this.internalY >= start.internalY && this.internalY <= end.internalY &&
+      this.internalZ >= start.internalZ && this.internalZ <= end.internalZ 
+    )
+  }
+
+  static zeroBlock = new MVec3<BlockUnit>(0 as BlockUnit,0 as BlockUnit,0 as BlockUnit)
+  static zeroFraction = new MVec3<BlockFractionUnit>(0 as BlockFractionUnit,0 as BlockFractionUnit,0 as BlockFractionUnit)
 }
 
 export function MVec3FractionToBlock(v: MVec3<BlockFractionUnit>){
