@@ -35,3 +35,13 @@ Negotiates, pretends to implement EmoteFix, that's it.
 - [ ] "Luma Freebuild" game mode: what you're used to
 - [ ] Plugin system: let game modes be further extendable
 - [ ] Support, new nice things, etc...
+
+
+# Acknowledgements
+This project would have never reached any state if not for the following members of the ClassiCube discord:
+- Vexyl
+- AmogusPH
+- UnknownShadow200
+
+Special thanks to Markus "Notch" Persson for creating Minecraft (duh!)
+Your dirty laundry (the classic protocol) is so much fun to build upon!

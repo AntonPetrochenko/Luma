@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-namespace */
+// Ambient type containing all block IDs
 namespace Block {
   export const enum Vanilla {
     Air,
