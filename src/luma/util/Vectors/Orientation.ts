@@ -1,4 +1,5 @@
 import { lerp } from "../Helpers/Lerp"
+import { BlockFractionUnit, BlockUnit, MVec3 } from "./MVec3"
 
 /** 
  * Minecraft yaw/pitch pair. Immutable. 
@@ -32,6 +33,21 @@ export class Orientation {
 
   public isEqualTo(other: Orientation) {
     return this.yaw == other.yaw && this.pitch == other.pitch
+  }
+
+  public toNormalVec3<T extends BlockUnit | BlockFractionUnit>(): MVec3<T> {
+    //minecraft world is z-up, therefore
+    // yaw is along x-y
+    // pitch is along x-z
+    const yawCorrected = Math.PI * ((this.yaw-64)/128)
+    const pitchCorrected = Math.PI * (this.pitch/128)
+    const xzLen = Math.cos(-pitchCorrected)
+    const x = xzLen * Math.cos(-yawCorrected)
+    const y = Math.sin(-pitchCorrected)
+    const z = xzLen * Math.sin(yawCorrected)
+
+    return new MVec3<T>(x as T, y as T, z as T)
+
   }
   private _yaw: number
   private _pitch: number

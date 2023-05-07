@@ -47,9 +47,9 @@ export function SpawnPlayer(playerId: number, playerName: string, player: Mobile
     0x07,
     playerId,
     mcstring(playerName),
-    player.position.x,
-    player.position.y,
-    player.position.z,
+    player.position.clientX,
+    player.position.clientY,
+    player.position.clientZ,
     player.orientation.yaw,
     player.orientation.pitch
   ])
@@ -67,9 +67,9 @@ export function SetPositionAndOrientation(playerId: number, player: Mobile) {
   return pack('>BbHHHBB', [
     0x08,
     playerId,
-    player.position.x,
-    player.position.y,
-    player.position.z,
+    player.position.clientX,
+    player.position.clientY,
+    player.position.clientZ,
     player.orientation.yaw,
     player.orientation.pitch
   ]) 
@@ -79,9 +79,9 @@ export function PositionUpdate(playerId: number, deltaPosition: MVec3<BlockFract
   return pack('>BbBBB', [
     0x0a,
     playerId,
-    deltaPosition.x,
-    deltaPosition.y,
-    deltaPosition.z
+    deltaPosition.clientX,
+    deltaPosition.clientY,
+    deltaPosition.clientZ
   ])
 }
 
@@ -97,9 +97,9 @@ export function OrientationUpdate(playerId: number, orientation: Orientation) {
 export function SetBlock(position: MVec3<BlockUnit>, blockId: number) {
   return pack('>BHHHB', [
     0x06,
-    position.x,
-    position.y,
-    position.z,
+    position.clientX,
+    position.clientY,
+    position.clientZ,
     blockId
   ])
 }
