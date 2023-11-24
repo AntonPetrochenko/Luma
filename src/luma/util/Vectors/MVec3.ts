@@ -65,10 +65,16 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
   }
 
   public normalized() {
+
+    //just in case
+    if (this.x == 0 && this.y == 0 && this.z == 0) {
+      return new MVec3<NumberType>(0 as NumberType, 0 as NumberType, -1 as NumberType)
+    }
+
     return new MVec3<NumberType> (
       this.x / this.magnitude as NumberType,
-      this.x / this.magnitude as NumberType,
-      this.x / this.magnitude as NumberType,
+      this.y / this.magnitude as NumberType,
+      this.z / this.magnitude as NumberType,
     ) 
   }
 

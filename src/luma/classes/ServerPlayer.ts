@@ -39,6 +39,7 @@ export interface WorldSafePlayer extends UnsafePlayer {
 export class UnsafePlayer implements Mobile {
   public CPE = {} as {[x: string]: ((...args: never[]) => unknown) | undefined}
   
+  public eyeLevel = 0 as BlockFractionUnit; 
   public sendPacket(packet: Buffer): Promise<void> {
     return new Promise((resolve) => {
       const w = () => {

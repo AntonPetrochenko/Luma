@@ -36,7 +36,7 @@ const defaultConfig =
     name: 'Unnamed server',
     motd: 'Nothing to say about this server',
     defaultWorld: 'lobby',
-    tickInterval: 1000/20,
+    tickInterval: 1/(1000/20),
     worlds: {
       lobby: {
         gamemode: 'luma-lobby',

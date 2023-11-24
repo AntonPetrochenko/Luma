@@ -12,6 +12,7 @@ import { BlockUnit, MVec3, MVec3FractionToBlock } from "../../luma/util/Vectors/
 import { MessageType, Mod_MessageTypes } from "../../luma/cpe_modules/MessageType";
 import { UnsafePlayer, verifyWorldSafe } from "../../luma/classes/ServerPlayer";
 import { BlockTickEvent } from "../../luma/events/BlockTickEvent";
+import { Monster } from "../../luma/classes/Entity/Monster";
 
 export const meta: GameModeMeta = {
   identifier: 'luma-lobby',
@@ -139,6 +140,16 @@ export default class implements GameMode {
             evt.player.sendPacket(OutgoingPackets.Message('Target: ' + targetVec.identity))
             evt.player.sendPacket(OutgoingPackets.Message('Position: ' + evt.player.position.identity))
             evt.player.sendPacket(OutgoingPackets.Message('Direction: ' + directionvec.identity))
+          }
+          
+          break;
+        }
+
+        case ('g'): {
+          const monster = new Monster(evt.player.position)
+
+          if (evt.player.world) {
+            evt.player.world.spawnEntity(monster)
           }
           
           break;

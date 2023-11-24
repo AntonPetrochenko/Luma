@@ -4,6 +4,7 @@ import { Mobile } from "../classes/Entity/EntityBase";
 import { dumpBufferToString } from "../util/Helpers/HexDumper";
 import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3";
 import { Orientation } from "../util/Vectors/Orientation";
+import { clamp } from "../util/Helpers/Clamp";
 
 /** Helper to format strings in Classic's bizarre format */
 function mcstring(s: string): string {
@@ -68,7 +69,7 @@ export function SetPositionAndOrientation(playerId: number, player: Mobile) {
     0x08,
     playerId,
     player.position.clientX,
-    player.position.clientY,
+    clamp(player.position.clientY + player.eyeLevel, 0, 65535),
     player.position.clientZ,
     player.orientation.yaw,
     player.orientation.pitch

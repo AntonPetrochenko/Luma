@@ -65,7 +65,8 @@ export class World extends EventEmitter {
   public tick(dt: number): TickInfo {
     //Update entities
     this.entities.forEach((entity) => {
-      entity.physicsUpdate(dt)
+      entity.update(dt)
+      this.broadcast(OutgoingPackets.SetPositionAndOrientation(entity.getEntityId(), entity))
     })
     //Emit global tick
     this.emit('tick', new TickEvent(dt))
@@ -211,6 +212,18 @@ export class World extends EventEmitter {
     this.blocks = new Uint8Array(this.volume)
 
     console.log(`Created a new world with size ${this.sizeX}x${this.sizeY}x${this.sizeZ} (volume is ${this.volume})`)
+  }
+
+  /** Given an entity, spawn it in the world, make it visible to players and begin updating it */
+  spawnEntity(entity: EntityBase) {
+
+    const newId = this.idTracker.take()
+
+    this.entities.add(entity)
+    entity.addToWorld(this, newId)
+
+    this.broadcast(OutgoingPackets.SpawnPlayer(newId, 'TESTIFICATE', entity))
+
   }
 
 
