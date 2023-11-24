@@ -23,7 +23,6 @@ Ongoing things:
 
 Future important tasks:
 - [ ] More CPE modules. Ideally, everything that ClassiCube supports.
-- [ ] A kitchen sink style game mode demonstrating all features of Luma
 
 Implemented CPE modules:
 - MessageType
@@ -31,9 +30,11 @@ Implemented CPE modules:
 ## Broad scope checklist
 - [x] 0.30 protocol: let there be server software
 - [x] "Game Mode" system: what makes Luma truly special
-- [ ] CPE support: catching up with the community
+- [x] CPE support: catching up with the community
+- [ ] More CPE extensions: catching up with the community
 - [ ] Luma Internal Goodies: catching up to speed with Minecraft, in a way
 - [ ] "Luma Freebuild" game mode: what you're used to
+- [ ] "Kitchen Sink" game mode: a bit of everything, to show off the power. Infiniminer, maybe?
 - [ ] Plugin system: let game modes be further extendable
 - [ ] Support, new nice things, etc...
 
