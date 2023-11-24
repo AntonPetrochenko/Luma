@@ -23,26 +23,28 @@ Ongoing things:
 
 Future important tasks:
 - [ ] More CPE modules. Ideally, everything that ClassiCube supports.
-- [ ] A kitchen sink style game mode demonstrating all features of Luma
 
 Implemented CPE modules:
 - MessageType
 
-## Broad scope checklist
+## Broad scope checklist and general random ideas
 - [x] 0.30 protocol: let there be server software
 - [x] "Game Mode" system: what makes Luma truly special
-- [ ] CPE support: catching up with the community
+- [x] CPE support: catching up with the community
+- [ ] More CPE extensions: catching up with the community
 - [ ] Luma Internal Goodies: catching up to speed with Minecraft, in a way
 - [ ] "Luma Freebuild" game mode: what you're used to
+- [ ] "Kitchen Sink" game mode: a bit of everything, to show off the power. Infiniminer, maybe?
 - [ ] Plugin system: let game modes be further extendable
 - [ ] Support, new nice things, etc...
 
 
 # Acknowledgements
+Special thanks to UnknownShadow200 for creating ClassiCube, the biggest and bestest 0.30 client ever. Without ClassiCube this project wouldn't have existed.
+
 This project would have never reached any workable state if not for the following members of the ClassiCube discord:
 - Vexyl
 - AmogusPH
-- UnknownShadow200, ey!
 
-Special thanks to Markus "Notch" Persson for creating Minecraft (duh!)
+And naturally, thanks to Markus "Notch" Persson for creating Minecraft (duh!)
 Your dirty laundry (the classic protocol) is so much fun to build upon!
