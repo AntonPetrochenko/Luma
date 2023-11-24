@@ -27,7 +27,7 @@ Future important tasks:
 Implemented CPE modules:
 - MessageType
 
-## Broad scope checklist
+## Broad scope checklist and general random ideas
 - [x] 0.30 protocol: let there be server software
 - [x] "Game Mode" system: what makes Luma truly special
 - [x] CPE support: catching up with the community
