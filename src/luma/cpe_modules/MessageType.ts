@@ -12,7 +12,7 @@ export enum MessageType {
   Status1,
   Status2,
   Status3,
-  BottomRight1,
+  BottomRight1 = 11,
   BottomRight2,
   BottomRight3,
   Announcement = 100

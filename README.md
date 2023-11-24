@@ -1,31 +1,32 @@
 # Luma
 Experimental Minecraft Classic server implemented in TypeScript, then taken way too seriously. May or may not get somewhere.
 
-The goal of this project is to create a highly extensible Minecraft Classic server.
+[Project manifesto](MANIFESTO.md)
 
-Luma is not meant to be a competitor to MCGalaxy. My idea behind Luma is "what if Minecraft Classic continued development as it's own game?" What I saw in it is potential for customizability. The extensions that the community had developed along the way create potential for a powerful, albeit quirky, platform for creating mini-games, kind of like Roblox. There are ways of almost completely redefining the appearance of the game, while still being confined to the style of Minecraft.
+## Useful links
 
-So, the general idea is to not implement "Minecraft Classic 0.30" per se, as other servers do, but rather to create a platform on which several "game modes" defined outside of the server can be implemented.
-
-Similarly to how Minetest is split into "minetest" and "minetest game" (+ a thousand other games) - an engine and a game built on top it, Luma is going to be split into "Luma" and "Luma Freebuild" (+ many more game modes made by you!)
-
-This project also intends to "backport" some later-game technical features into Classic, such as entities (...really?) and block states (redstone? eh, don't count on it)
+- [Minecraft Classic protocol specification](https://wiki.vg/Classic_Protocol)
+- [Classic Protocol Extension (CPE) specification](https://wiki.vg/Classic_Protocol_Extension)
 
 ## Current state of the project
 - Normal 0.30 protocol implemented in full
+- Worlds fully interactive, synced between clients, but not persisted.
 - First iteration of the Game Mode system is in place. Requires further work.
-- Multiworld
+- Naturally, multiworld support
+- CPE support. CPE modules can be defined, including the ability for creating fallback logic for clients not supporting specific CPE functionality.
 
 Ongoing things:
-- Entities!
-- CPE time!
+- Entities! Groundwork laid down, collision designed and partially implemented.
+- Block updates
+- Powerful helpers for querying multi-block structures (think Nether Reactor and Wither/Golem summons)
 - Events for everything
 
 Future important tasks:
-- [ ] Entities
+- [ ] More CPE modules. Ideally, everything that ClassiCube supports.
+- [ ] A kitchen sink style game mode demonstrating all features of Luma
 
-- CPE implementation:
-Negotiates, pretends to implement EmoteFix, that's it.
+Implemented CPE modules:
+- MessageType
 
 ## Broad scope checklist
 - [x] 0.30 protocol: let there be server software
@@ -38,10 +39,10 @@ Negotiates, pretends to implement EmoteFix, that's it.
 
 
 # Acknowledgements
-This project would have never reached any state if not for the following members of the ClassiCube discord:
+This project would have never reached any workable state if not for the following members of the ClassiCube discord:
 - Vexyl
 - AmogusPH
-- UnknownShadow200
+- UnknownShadow200, ey!
 
 Special thanks to Markus "Notch" Persson for creating Minecraft (duh!)
 Your dirty laundry (the classic protocol) is so much fun to build upon!

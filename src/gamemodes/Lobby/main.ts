@@ -8,10 +8,11 @@ import { createReadStream } from "fs";
 import { dumpBufferToString } from "../../luma/util/Helpers/HexDumper";
 import { TickEvent } from "../../luma/events/TickEvent";
 import { randInt } from "../../luma/util/Helpers/RandInt";
-import { BlockUnit, MVec3 } from "../../luma/util/Vectors/MVec3";
+import { BlockUnit, MVec3, MVec3FractionToBlock } from "../../luma/util/Vectors/MVec3";
 import { MessageType, Mod_MessageTypes } from "../../luma/cpe_modules/MessageType";
-import { UnsafePlayer } from "../../luma/classes/ServerPlayer";
+import { UnsafePlayer, verifyWorldSafe } from "../../luma/classes/ServerPlayer";
 import { BlockTickEvent } from "../../luma/events/BlockTickEvent";
+import { Monster } from "../../luma/classes/Entity/Monster";
 
 export const meta: GameModeMeta = {
   identifier: 'luma-lobby',
@@ -52,6 +53,13 @@ export default class implements GameMode {
             pos
           ) 
         }
+
+      world.players.forEach((player) => {
+        if (Mod_MessageTypes.supportedBy(player)) {
+          player.CPE.sendTypedMessage(MessageType.Status1, player.position.identity)
+          player.CPE.sendTypedMessage(MessageType.Status2, "Y: " + player.orientation.yaw + ' P: ' + player.orientation.pitch)
+        }
+      })
     })
 
     world.on('block-tick', (evt: BlockTickEvent) => {
@@ -120,6 +128,32 @@ export default class implements GameMode {
           }
           break;
         }
+        case ('test-o'): {
+          if (verifyWorldSafe(evt.player, world)) {
+            const directionvec = evt.player.orientation.toNormalVec3<BlockUnit>().scaled(5)
+            const targetVec = directionvec.sum(MVec3FractionToBlock(evt.player.position))
+            world.setBlockAtMVec3(Block.Vanilla.Obsidian, targetVec)
+            // if (Mod_MessageTypes.supportedBy(evt.player)) {
+            //   evt.player.CPE.sendTypedMessage(MessageType.BottomRight1, targetVec.identity)
+            // }
+            evt.player.sendPacket(OutgoingPackets.Message('Testing...'))
+            evt.player.sendPacket(OutgoingPackets.Message('Target: ' + targetVec.identity))
+            evt.player.sendPacket(OutgoingPackets.Message('Position: ' + evt.player.position.identity))
+            evt.player.sendPacket(OutgoingPackets.Message('Direction: ' + directionvec.identity))
+          }
+          
+          break;
+        }
+
+        case ('g'): {
+          const monster = new Monster(evt.player.position)
+
+          if (evt.player.world) {
+            evt.player.world.spawnEntity(monster)
+          }
+          
+          break;
+        }
         default: {
           evt.deny('&cNo dice.')
           break;
@@ -128,3 +162,4 @@ export default class implements GameMode {
     }) 
   }
 }
+

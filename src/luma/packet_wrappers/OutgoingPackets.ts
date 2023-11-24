@@ -4,6 +4,7 @@ import { Mobile } from "../classes/Entity/EntityBase";
 import { dumpBufferToString } from "../util/Helpers/HexDumper";
 import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3";
 import { Orientation } from "../util/Vectors/Orientation";
+import { clamp } from "../util/Helpers/Clamp";
 
 /** Helper to format strings in Classic's bizarre format */
 function mcstring(s: string): string {
@@ -47,9 +48,9 @@ export function SpawnPlayer(playerId: number, playerName: string, player: Mobile
     0x07,
     playerId,
     mcstring(playerName),
-    player.position.x,
-    player.position.y,
-    player.position.z,
+    player.position.clientX,
+    player.position.clientY,
+    player.position.clientZ,
     player.orientation.yaw,
     player.orientation.pitch
   ])
@@ -67,9 +68,9 @@ export function SetPositionAndOrientation(playerId: number, player: Mobile) {
   return pack('>BbHHHBB', [
     0x08,
     playerId,
-    player.position.x,
-    player.position.y,
-    player.position.z,
+    player.position.clientX,
+    clamp(player.position.clientY + player.eyeLevel, 0, 65535),
+    player.position.clientZ,
     player.orientation.yaw,
     player.orientation.pitch
   ]) 
@@ -79,9 +80,9 @@ export function PositionUpdate(playerId: number, deltaPosition: MVec3<BlockFract
   return pack('>BbBBB', [
     0x0a,
     playerId,
-    deltaPosition.x,
-    deltaPosition.y,
-    deltaPosition.z
+    deltaPosition.clientX,
+    deltaPosition.clientY,
+    deltaPosition.clientZ
   ])
 }
 
@@ -97,9 +98,9 @@ export function OrientationUpdate(playerId: number, orientation: Orientation) {
 export function SetBlock(position: MVec3<BlockUnit>, blockId: number) {
   return pack('>BHHHB', [
     0x06,
-    position.x,
-    position.y,
-    position.z,
+    position.clientX,
+    position.clientY,
+    position.clientZ,
     blockId
   ])
 }

@@ -63,6 +63,11 @@ export class World extends EventEmitter {
   }
 
   public tick(dt: number): TickInfo {
+    //Update entities
+    this.entities.forEach((entity) => {
+      entity.update(dt)
+      this.broadcast(OutgoingPackets.SetPositionAndOrientation(entity.getEntityId(), entity))
+    })
     //Emit global tick
     this.emit('tick', new TickEvent(dt))
     //Emit dedicated block tick events
@@ -103,16 +108,16 @@ export class World extends EventEmitter {
     return this.sizeY*this.sizeX*y + this.sizeX*z + x
   }
 
-  private getBlockInternal(x: number, y: number, z: number): number {
+  public getBlockAtXYZ(x: number, y: number, z: number): number {
     return this.blocks[this.blockIndex(x,y,z)]
   }
   public getBlockAtMVec3(position: MVec3<BlockUnit>): number {
     if (
-      position.x >= 0 && position.x < this.sizeX,
-      position.y >= 0 && position.y < this.sizeY,
-      position.z >= 0 && position.x < this.sizeZ
+      position.clientX >= 0 && position.clientX < this.sizeX,
+      position.clientY >= 0 && position.clientY < this.sizeY,
+      position.clientZ >= 0 && position.clientX < this.sizeZ
     ) {
-      return this.blocks[this.blockIndex(position.x, position.y, position.z)]
+      return this.blocks[this.blockIndex(position.clientX, position.clientY, position.clientZ)]
     } else {
       return Block.Vanilla.Bedrock
     }
@@ -124,11 +129,11 @@ export class World extends EventEmitter {
 
   public setBlockAtMVec3(blockID: number, position: MVec3<BlockUnit>) {
     if (
-      position.x >= 0 && position.x < this.sizeX,
-      position.y >= 0 && position.y < this.sizeY,
-      position.z >= 0 && position.x < this.sizeZ
+      position.clientX >= 0 && position.clientX < this.sizeX,
+      position.clientY >= 0 && position.clientY < this.sizeY,
+      position.clientZ >= 0 && position.clientX < this.sizeZ
     ) {
-      this.blocks[this.blockIndex(position.x, position.y, position.z)] = blockID
+      this.blocks[this.blockIndex(position.clientX, position.clientY, position.clientZ)] = blockID
       this.blockUpdatesThisTick.setBlock(position, blockID)
     }
   }
@@ -160,7 +165,7 @@ export class World extends EventEmitter {
     for (let yPos = 0; yPos < this.sizeY; yPos++) {
       for (let zPos = 0; zPos < this.sizeZ; zPos++) {
         for (let xPos = 0; xPos < this.sizeX; xPos++) {
-          values.push(this.getBlockInternal(xPos, yPos, zPos))
+          values.push(this.getBlockAtXYZ(xPos, yPos, zPos))
         }
       }
     }
@@ -207,6 +212,18 @@ export class World extends EventEmitter {
     this.blocks = new Uint8Array(this.volume)
 
     console.log(`Created a new world with size ${this.sizeX}x${this.sizeY}x${this.sizeZ} (volume is ${this.volume})`)
+  }
+
+  /** Given an entity, spawn it in the world, make it visible to players and begin updating it */
+  spawnEntity(entity: EntityBase) {
+
+    const newId = this.idTracker.take()
+
+    this.entities.add(entity)
+    entity.addToWorld(this, newId)
+
+    this.broadcast(OutgoingPackets.SpawnPlayer(newId, 'TESTIFICATE', entity))
+
   }
 
 

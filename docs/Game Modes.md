@@ -2,6 +2,7 @@ Game Mode System
 ================
 
 _Warning: this system is provisional, details are subject to change_
+
 _Last revision: March 26 2023_
 
 The game mode system facilitates the ability to create arbitrary custom game logic within a specific world.

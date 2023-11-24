@@ -10,65 +10,71 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
 
   public readonly identity: string  
   constructor(
-    public internalX: NumberType,
-    public internalY: NumberType,
-    public internalZ: NumberType
+    public x: NumberType,
+    public y: NumberType,
+    public z: NumberType
   ) {
-    this.identity = `${this.internalX} ${this.internalY} ${this.internalZ}`
+    this.identity = `${Math.floor(this.x)} ${Math.floor(this.y)} ${Math.floor(this.z)}`
   }
 
   //As far as Minecraft is concerned, these are integers. Let's treat them appropriately.
   //We'll see how well this design decision goes
-  public get x(): NumberType { return Math.floor(this.internalX) as NumberType }
-  public get y(): NumberType { return Math.floor(this.internalY) as NumberType }
-  public get z(): NumberType { return Math.floor(this.internalZ) as NumberType }
+  public get clientX(): NumberType { return Math.floor(this.x) as NumberType }
+  public get clientY(): NumberType { return Math.floor(this.y) as NumberType }
+  public get clientZ(): NumberType { return Math.floor(this.z) as NumberType }
 
   //For internal calculations, private values are used for extra precision
   copy() {
-   return new MVec3<NumberType>(this.internalX, this.internalY, this.internalZ) 
+   return new MVec3<NumberType>(this.x, this.y, this.z) 
   }
 
   sum(other: MVec3<NumberType>) {
     return new MVec3<NumberType> (
-      this.internalX + other.internalX as NumberType, // i know "as NumberType" doesn't really make sense here
-      this.internalY + other.internalY as NumberType, // but we're dealing with make-believe nominal types in ts
-      this.internalZ + other.internalZ as NumberType, // so this is kind of required
+      this.x + other.x as NumberType, // i know "as NumberType" doesn't really make sense here
+      this.y + other.y as NumberType, // but we're dealing with make-believe nominal types in ts
+      this.z + other.z as NumberType, // so this is kind of required
     )
   }
 
   offset(x: number,y: number,z: number) {
     return new MVec3<NumberType>(
-      this.internalX + x as NumberType,
-      this.internalY + y as NumberType,
-      this.internalZ + z as NumberType
+      this.x + x as NumberType,
+      this.y + y as NumberType,
+      this.z + z as NumberType
     )
   }
 
   delta(towards: MVec3<NumberType>) {
     return new MVec3<NumberType> (
-      towards.internalX - this.internalX as NumberType,
-      towards.internalY - this.internalY as NumberType,
-      towards.internalZ - this.internalZ as NumberType,
+      towards.x - this.x as NumberType,
+      towards.y - this.y as NumberType,
+      towards.z - this.z as NumberType,
     )
   }
 
   scaled(scale: number) {
     return new MVec3<NumberType> (
-      this.internalX * scale as NumberType, 
-      this.internalY * scale as NumberType, 
-      this.internalZ * scale as NumberType  
+      this.x * scale as NumberType, 
+      this.y * scale as NumberType, 
+      this.z * scale as NumberType  
     )
   }
 
   public get magnitude(): NumberType {
-    return Math.sqrt(this.internalX^2 + this.internalY^2 + this.internalZ^2) as NumberType
+    return Math.sqrt(this.x^2 + this.y^2 + this.z^2) as NumberType
   }
 
   public normalized() {
+
+    //just in case
+    if (this.x == 0 && this.y == 0 && this.z == 0) {
+      return new MVec3<NumberType>(0 as NumberType, 0 as NumberType, -1 as NumberType)
+    }
+
     return new MVec3<NumberType> (
-      this.internalX / this.magnitude as NumberType,
-      this.internalX / this.magnitude as NumberType,
-      this.internalX / this.magnitude as NumberType,
+      this.x / this.magnitude as NumberType,
+      this.y / this.magnitude as NumberType,
+      this.z / this.magnitude as NumberType,
     ) 
   }
 
@@ -76,7 +82,7 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
   /** Whether or not the two vectors point to the same point in Minecraft space */
   public isEqualTo(other: MVec3<NumberType>) {
     return (
-      this.x == other.x && this.y == other.y && this.z == other.z
+      this.clientX == other.clientX && this.clientY == other.clientY && this.clientZ == other.clientZ
     )
   }
 
@@ -85,20 +91,32 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
    * */
   public boundedBy(start: MVec3<NumberType>, end: MVec3<NumberType>) {
     return (
-      this.internalX >= start.internalX && this.internalX <= end.internalX &&
-      this.internalY >= start.internalY && this.internalY <= end.internalY &&
-      this.internalZ >= start.internalZ && this.internalZ <= end.internalZ 
+      this.x >= start.x && this.x <= end.x &&
+      this.y >= start.y && this.y <= end.y &&
+      this.z >= start.z && this.z <= end.z 
     )
   }
 
   static zeroBlock = new MVec3<BlockUnit>(0 as BlockUnit,0 as BlockUnit,0 as BlockUnit)
   static zeroFraction = new MVec3<BlockFractionUnit>(0 as BlockFractionUnit,0 as BlockFractionUnit,0 as BlockFractionUnit)
+
+  static fromArray<NumberType extends MinecraftLengthUnit>(vec: [number, number, number]) {
+    return new MVec3<NumberType>(
+      vec[0] as NumberType,
+      vec[1] as NumberType,
+      vec[2] as NumberType
+    )
+  }
+
+  public toArray(): [number, number, number] {
+    return [this.x, this.y, this.z]
+  }
 }
 
 export function MVec3FractionToBlock(v: MVec3<BlockFractionUnit>){
-  return v.scaled(32) as unknown as MVec3<BlockUnit>
+  return v.scaled(1/32) as unknown as MVec3<BlockUnit>
 }
 
 export function MVec3BlockToFraction(v: MVec3<BlockUnit>){
-  return v.scaled(1/32) as unknown as MVec3<BlockFractionUnit>
+  return v.scaled(32) as unknown as MVec3<BlockFractionUnit>
 }
