@@ -36,7 +36,7 @@ export class Orientation {
   }
 
   public toNormalVec3<T extends BlockUnit | BlockFractionUnit>(): MVec3<T> {
-    //minecraft world is z-up, therefore
+    //minecraft world is y-up, therefore
     // yaw is along x-y
     // pitch is along x-z
     const yawCorrected = Math.PI * ((this.yaw-64)/128)

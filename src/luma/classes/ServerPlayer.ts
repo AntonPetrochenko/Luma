@@ -5,6 +5,7 @@ import { Mobile } from "./Entity/EntityBase";
 import { MinecraftClassicServer } from "./MinecraftClassicServer";
 import { World } from "./World";
 import { CPE_ExtEntry } from "../packet_wrappers/IncomingPackets";
+import { EventEmitter } from "stream";
 
 
 
@@ -36,7 +37,7 @@ export interface WorldSafePlayer extends UnsafePlayer {
   connected: true
 }
 
-export class UnsafePlayer implements Mobile {
+export class UnsafePlayer extends EventEmitter implements Mobile  {
   public CPE = {} as {[x: string]: ((...args: never[]) => unknown) | undefined}
   
   public eyeLevel = 0 as BlockFractionUnit; 
@@ -90,6 +91,7 @@ export class UnsafePlayer implements Mobile {
   }
 
   constructor(socket: Socket, world: World) {
+    super() 
     this.socket = socket
     this.world = world
   }

@@ -14,7 +14,7 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
     public y: NumberType,
     public z: NumberType
   ) {
-    this.identity = `${Math.floor(this.x)} ${Math.floor(this.y)} ${Math.floor(this.z)}`
+    this.identity = `X: ${Math.floor(this.x)} Y: ${Math.floor(this.y)} Z: ${Math.floor(this.z)}`
   }
 
   //As far as Minecraft is concerned, these are integers. Let's treat them appropriately.
@@ -61,7 +61,7 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
   }
 
   public get magnitude(): NumberType {
-    return Math.sqrt(this.x^2 + this.y^2 + this.z^2) as NumberType
+    return Math.sqrt(this.x**2 + this.y**2 + this.z**2) as NumberType
   }
 
   public normalized() {
@@ -99,6 +99,9 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
 
   static zeroBlock = new MVec3<BlockUnit>(0 as BlockUnit,0 as BlockUnit,0 as BlockUnit)
   static zeroFraction = new MVec3<BlockFractionUnit>(0 as BlockFractionUnit,0 as BlockFractionUnit,0 as BlockFractionUnit)
+
+  static makeZeroBlock = () => new MVec3<BlockUnit>(0 as BlockUnit,0 as BlockUnit,0 as BlockUnit)
+  static makeZeroFraction = () => new MVec3<BlockFractionUnit>(0 as BlockFractionUnit,0 as BlockFractionUnit,0 as BlockFractionUnit)
 
   static fromArray<NumberType extends MinecraftLengthUnit>(vec: [number, number, number]) {
     return new MVec3<NumberType>(

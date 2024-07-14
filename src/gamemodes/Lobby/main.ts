@@ -13,6 +13,7 @@ import { MessageType, Mod_MessageTypes } from "../../luma/cpe_modules/MessageTyp
 import { UnsafePlayer, verifyWorldSafe } from "../../luma/classes/ServerPlayer";
 import { BlockTickEvent } from "../../luma/events/BlockTickEvent";
 import { Monster } from "../../luma/classes/Entity/Monster";
+import { Mod_CustomParticles } from "../../luma/cpe_modules/CustomParticles";
 
 export const meta: GameModeMeta = {
   identifier: 'luma-lobby',
@@ -63,22 +64,22 @@ export default class implements GameMode {
     })
 
     world.on('block-tick', (evt: BlockTickEvent) => {
-      switch (evt.blockId) {
-        case Block.Vanilla.Wood: {
-          world.setBlockAtMVec3(Block.Vanilla.Wood, evt.position.offset(0,1,0)) 
-          break;
-        }
-        case Block.Vanilla.GrassBlock: {
-          world.setBlockAtMVec3(Block.Vanilla.Glass, evt.position) 
-          break;
-        }
-      }
+      // switch (evt.blockId) {
+      //   case Block.Vanilla.Wood: {
+      //     world.setBlockAtMVec3(Block.Vanilla.Wood, evt.position.offset(0,1,0)) 
+      //     break;
+      //   }
+      //   case Block.Vanilla.GrassBlock: {
+      //     world.setBlockAtMVec3(Block.Vanilla.Glass, evt.position) 
+      //     break;
+      //   }
+      // }
     })
 
     server.on('command-lobby', (evt: CommandEvent) => {
       evt.deny(`Lobby gamemode handled a command! Params: ${evt.args.join(', ')}`)
     })
-    server.on('command-debug', (evt: CommandEvent) => {
+    server.on('command-debug', async (evt: CommandEvent) => {
       evt.markHandled()
       switch (evt.args[0]) {
         case ('world'): {
@@ -142,6 +143,27 @@ export default class implements GameMode {
             evt.player.sendPacket(OutgoingPackets.Message('Direction: ' + directionvec.identity))
           }
           
+          break;
+        }
+
+        case('particletest'): {
+          if (Mod_CustomParticles.supportedBy(evt.player)) {
+            await evt.player.CPE.registerParticle({
+              effectId: 1,
+              uv: [4,4,8,8],
+              baseLifetime: 0.05,
+              collideFlags: {
+                despawnOnFloors: false,
+                collideWithFluids: false,
+                collideWithLeaves: false,
+                collideWithSolids: false,
+                padding: false
+              },
+              particleCount: 16,
+              sizeVariation: 0
+            })
+            await evt.player.CPE.particle(1, evt.player.position.offset(0,32,0))
+          }
           break;
         }
 

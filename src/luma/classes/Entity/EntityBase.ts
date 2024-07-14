@@ -3,6 +3,7 @@ import { Orientation } from "../../util/Vectors/Orientation";
 import { World } from "../World";
 import { RaycastResult, castAlong } from "../../util/FastVoxelRaycast";
 import { walkSurface } from "../../util/Helpers/WalkSurface";
+import { globalParticleEffect } from "../../cpe_modules/CustomParticles";
 
 export interface Mobile {
   position: MVec3<BlockFractionUnit>
@@ -85,14 +86,11 @@ export abstract class EntityBase implements Mobile {
 
     
     //We're calculating strictly in block units because the world operates in block units
-    const blockPosition = MVec3FractionToBlock(this.position)
+    const entityBlockPosition = MVec3FractionToBlock(this.position)
 
-
-    
     //Position the hitbox and it's far point at the entity's position
-    const localHitbox = blockPosition.sum(this.hitboxOrigin)
-    //...and it's far point
-    const localHitboxFarPoint = blockPosition.sum(this.hitboxFarPoint)
+    const localHitbox = entityBlockPosition.sum(this.hitboxOrigin)
+    const localHitboxFarPoint = entityBlockPosition.sum(this.hitboxFarPoint)
     
     
     //Given a surface corresponding to an axis, iterate on the other axes while keeping the surface axis constant
@@ -102,52 +100,69 @@ export abstract class EntityBase implements Mobile {
     let yCollision: RaycastResult | undefined
     let zCollision: RaycastResult | undefined
     
-    const pickedXSurface = motionThisTick.x < 0 ? localHitbox.x : localHitboxFarPoint.x
-    walkSurface(localHitbox.z, localHitbox.y, localHitboxFarPoint.z, localHitboxFarPoint.y, (zWorldPosition, yWorldPosition) => {
-      xCollision = castAlong(
-        world, 
-        new MVec3<BlockUnit>(
-          pickedXSurface as BlockUnit, 
-          yWorldPosition as BlockUnit, 
-          zWorldPosition as BlockUnit
-        ),
-        motionThisTick
-      )
-    })
+    // const pickedXSurface = motionThisTick.x < 0 ? localHitbox.x : localHitboxFarPoint.x
+    // walkSurface(localHitbox.z, localHitbox.y, localHitboxFarPoint.z, localHitboxFarPoint.y, (zWorldPosition, yWorldPosition) => {
+    //   const vec = new MVec3<BlockUnit>(
+    //     pickedXSurface as BlockUnit, 
+    //     yWorldPosition as BlockUnit, 
+    //     zWorldPosition as BlockUnit
+    //   )
+    //   globalParticleEffect(world, 1, MVec3BlockToFraction(vec))
+    //   xCollision = castAlong(
+    //     world, 
+    //     vec,
+    //     motionThisTick,
+    //     motionThisTick.magnitude
+    //   )
+    // })
     
     const pickedYSurface = motionThisTick.y < 0 ? localHitbox.y : localHitboxFarPoint.y
     walkSurface(localHitbox.x, localHitbox.z, localHitboxFarPoint.x, localHitboxFarPoint.z, (xWorldPosition, zWorldPosition) => {
-      yCollision = castAlong(
+      // debug_array.push([xWorldPosition, pickedYSurface, zWorldPosition])
+      const vec = new MVec3<BlockUnit>(
+        xWorldPosition as BlockUnit, 
+        pickedYSurface as BlockUnit, 
+        zWorldPosition as BlockUnit
+      )
+      // globalParticleEffect(world, 1, MVec3BlockToFraction(vec))
+      yCollision = yCollision || castAlong(
         world, 
-        new MVec3<BlockUnit>(
-          xWorldPosition as BlockUnit, 
-          pickedYSurface as BlockUnit, 
-          zWorldPosition as BlockUnit
-        ),
-        motionThisTick
+        vec,
+        motionThisTick,
+        motionThisTick.magnitude
       )
     })
     
-    const pickedZSurface = motionThisTick.z < 0 ? localHitbox.z : localHitboxFarPoint.z
-    walkSurface(localHitbox.x, localHitbox.y, localHitboxFarPoint.x, localHitboxFarPoint.y, (xWorldPosition, yWorldPosition) => {
-      zCollision = castAlong(
-        world, 
-        new MVec3<BlockUnit>(
-          xWorldPosition as BlockUnit, 
-          yWorldPosition as BlockUnit, 
-          pickedZSurface as BlockUnit
-        ),
-        motionThisTick
-      )
-    })
+    // const pickedZSurface = motionThisTick.z < 0 ? localHitbox.z : localHitboxFarPoint.z
+    // walkSurface(localHitbox.x, localHitbox.y, localHitboxFarPoint.x, localHitboxFarPoint.y, (xWorldPosition, yWorldPosition) => {
 
-    if (zCollision) {
-      const zCollisionFraction = MVec3BlockToFraction(zCollision.position)
-      if (zCollision.normal[2] > 0) {
-        this.position.z = zCollisionFraction.z
-      } else {
-        this.position.z = (zCollisionFraction.z - this.hitboxFarPointFraction.z) as BlockFractionUnit
+    //   const vec = new MVec3<BlockUnit>(
+    //     xWorldPosition as BlockUnit, 
+    //     yWorldPosition as BlockUnit, 
+    //     pickedZSurface as BlockUnit
+    //   )
+    //   globalParticleEffect(world, 1, MVec3BlockToFraction(vec))
+    //   zCollision = castAlong(
+    //     world, 
+    //     vec,
+    //     motionThisTick,
+    //     motionThisTick.magnitude
+    //   )
+    // })
+
+    if (yCollision) {
+      const yCollisionFraction = MVec3BlockToFraction(yCollision.position)
+      if (yCollision.result == 0) {
+        console.error(zCollision)
+        throw new Error('Instructions unclear, collided with air!')
       }
+      //y-up
+      if (yCollision.normal[1] > 0) {
+        //floor collision
+        this.position.y = yCollisionFraction.y + 0.1 as BlockFractionUnit
+        this.velocity.y = 0 as BlockUnit
+      }
+
     }
 
 
@@ -156,12 +171,12 @@ export abstract class EntityBase implements Mobile {
   }
 
   public update(dt: number) {
-    //Add gravity to velocity
-    this.velocity = this.velocity.offset(0,-3.92*dt,0)
-  
+    //Do the normal things
     this.think(dt)
     this.move(dt)
-
+    
+    //Apply gravity
+    this.velocity = this.velocity.offset(0,-3.92*dt,0)
 
     //invisible walls
 
