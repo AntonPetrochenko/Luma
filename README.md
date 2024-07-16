@@ -1,6 +1,8 @@
 # Luma
 Experimental Minecraft Classic server implemented in TypeScript, then taken way too seriously. May or may not get somewhere.
 
+[Check out the entities branch!](https://github.com/AntonPetrochenko/Luma/tree/entities)
+
 [Project manifesto](MANIFESTO.md)
 
 ## Useful links
