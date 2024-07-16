@@ -33,10 +33,10 @@ import { LumaCPESupportInfo } from '../cpe_modules/CPE'
 
 const defaultConfig =
   {
-    name: 'Unnamed server',
-    motd: 'Nothing to say about this server',
+    name: 'Luma Test Server',
+    motd: 'Test server for Luma server software',
     defaultWorld: 'lobby',
-    tickInterval: 1/(1000/20),
+    tickInterval: 1000/20,
     worlds: {
       lobby: {
         gamemode: 'luma-lobby',
@@ -175,7 +175,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       const newWorld = new World({
         sizeX: worldInfo.size[0],
         sizeY: worldInfo.size[1],
-        sizeZ: worldInfo.size[3]
+        sizeZ: worldInfo.size[2]
       })
 
       const worldGameModeModule = gamemodes.get(worldInfo.gamemode)
@@ -204,14 +204,15 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
     
     //Start ticking worlds
     //TODO: Use delta time
-    this.worldTickingInterval = setInterval(this.worldTick.bind(this), this.config.settings.tickInterval)
+    this.worldTickingInterval = setInterval(this.worldTick.bind(this), 50)
 
   }
 
   private worldTick() {
+    const dt = this.config.settings.tickInterval/1000
     this.worlds.forEach( (world) => {
       //TODO: Use delta time
-      const worldTickInfo = world.tick(this.config.settings.tickInterval)
+      const worldTickInfo = world.tick(dt)
       world.players.forEach( player => {
         if (player.supports('BulkBlockUpdate')) {
           //Brew BulkBlockUpdate packets

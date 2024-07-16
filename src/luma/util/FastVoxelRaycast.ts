@@ -12,7 +12,8 @@ export function makeVoxelGetter(world: World) {
 export interface RaycastResult {
   result: number
   position: MVec3<BlockUnit>
-  normal: [number, number, number]
+  normal: [number, number, number],
+  distance: number
 }
 
 /** Wrapped Fast Voxel Raycast */
@@ -21,9 +22,12 @@ export function castAlong(world: World, origin: MVec3<BlockUnit>, direction: MVe
   const out_normal: [number, number, number] = [0,0,0]
   const result = raycast( makeVoxelGetter(world), origin.toArray(), direction.normalized().toArray(), distance, out_position, out_normal)
 
+  const resultPosition = new MVec3(...out_position as [BlockUnit, BlockUnit, BlockUnit])
+
+  const resultDistance = resultPosition.delta(origin).magnitude
   if (result > 0) {
     return {
-      result, position: new MVec3(...out_position as [BlockUnit, BlockUnit, BlockUnit]), normal: out_normal
+      result, position: resultPosition, normal: out_normal, distance: resultDistance
     } 
   }
 } 

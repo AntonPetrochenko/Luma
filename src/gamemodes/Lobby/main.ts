@@ -6,14 +6,13 @@ import { GameMode, GameModeMeta } from "../../luma/interfaces/GameMode";
 import * as OutgoingPackets from '../../luma/packet_wrappers/OutgoingPackets'
 import { createReadStream } from "fs";
 import { dumpBufferToString } from "../../luma/util/Helpers/HexDumper";
-import { TickEvent } from "../../luma/events/TickEvent";
-import { randInt } from "../../luma/util/Helpers/RandInt";
-import { BlockUnit, MVec3, MVec3FractionToBlock } from "../../luma/util/Vectors/MVec3";
+import { BlockUnit, MVec3FractionToBlock } from "../../luma/util/Vectors/MVec3";
 import { MessageType, Mod_MessageTypes } from "../../luma/cpe_modules/MessageType";
-import { UnsafePlayer, verifyWorldSafe } from "../../luma/classes/ServerPlayer";
-import { BlockTickEvent } from "../../luma/events/BlockTickEvent";
+import { verifyWorldSafe } from "../../luma/classes/ServerPlayer";
 import { Monster } from "../../luma/classes/Entity/Monster";
 import { Mod_CustomParticles } from "../../luma/cpe_modules/CustomParticles";
+import { createNoise2D } from "simplex-noise";
+import { distance2d } from "../../luma/util/Helpers/Distance";
 
 export const meta: GameModeMeta = {
   identifier: 'luma-lobby',
@@ -23,58 +22,77 @@ export const meta: GameModeMeta = {
 
 export default class implements GameMode {
   setup(world: World, server: MinecraftClassicServer) {
-    world.generateSimple((x, y, z, sx, sy) => {
-      if (x==z) return Block.Vanilla.Glass
-      const waterLevel = sy/2
-      if (y<waterLevel) {
-        return Block.Vanilla.Stone
-      }
-      if (y==waterLevel) {
-        return Block.Vanilla.GrassBlock
-      }
-      return Block.Vanilla.Air
-    })
-    // world.on('block-modified', (evt: SetBlockEvent) => {
-    //   console.log(`Denied block placement for ${evt.player}`)
-    //   evt.deny()
-    // })
+    
+    const noises = [
+      {scale: 128, amplitude: 10},
+      {scale: 256, amplitude: 20},
+      {scale: 64, amplitude: 5}
+    ]
 
-    world.on('tick', () => {
-    // console.log('ticked')
-      const pos = new MVec3<BlockUnit>(
-        randInt(world.sizeX) as BlockUnit,
-        randInt(world.sizeY) as BlockUnit,
-        randInt(world.sizeZ) as BlockUnit
-      )
+    const noises2 = [
+      {scale: 64, amplitude: 10},
+      {scale: 32, amplitude: 2}
+    ]
 
-      const b = world.getBlockAtMVec3(pos)
-        if (b != Block.Vanilla.Air) {
-          world.setBlockAtMVec3(
-            Block.Vanilla.Dirt,
-            pos
-          ) 
+    const noiseGen = createNoise2D()
+    const noiseGen2 = createNoise2D()
+    console.log('Raising...')
+    for (let zPos = 0; zPos < world.sizeZ; zPos++) {
+      for (let xPos = 0; xPos < world.sizeX; xPos++) {
+        
+
+        let heightPoint = 40
+        noises.forEach( n => {
+          heightPoint += noiseGen(xPos/n.scale,zPos/n.scale)  * n.amplitude
+        })
+
+        
+
+        const distanceFromCenter = distance2d(world.sizeX/2, world.sizeZ/2, xPos, zPos)
+        heightPoint -= (distanceFromCenter/world.sizeY)*4
+        
+        if (heightPoint > 32) {
+          const raiser = noiseGen2((xPos+noiseGen2(xPos/64, zPos/64)*8)/64, (zPos+noiseGen2(xPos/64, zPos/64)*8)/64)
+          if (raiser > 0.5) {
+
+            let heightPoint2 = 0
+            noises2.forEach( n => {
+              heightPoint2 += noiseGen2(xPos/n.scale,zPos/n.scale)  * n.amplitude
+            })
+
+            heightPoint += heightPoint2
+
+            
+          }
+
         }
 
-      world.players.forEach((player) => {
-        if (Mod_MessageTypes.supportedBy(player)) {
-          player.CPE.sendTypedMessage(MessageType.Status1, player.position.identity)
-          player.CPE.sendTypedMessage(MessageType.Status2, "Y: " + player.orientation.yaw + ' P: ' + player.orientation.pitch)
-        }
-      })
-    })
+        // heightPoint = Math.max(heightPoint, 64)
+        heightPoint = Math.floor(heightPoint)
 
-    world.on('block-tick', (evt: BlockTickEvent) => {
-      // switch (evt.blockId) {
-      //   case Block.Vanilla.Wood: {
-      //     world.setBlockAtMVec3(Block.Vanilla.Wood, evt.position.offset(0,1,0)) 
-      //     break;
-      //   }
-      //   case Block.Vanilla.GrassBlock: {
-      //     world.setBlockAtMVec3(Block.Vanilla.Glass, evt.position) 
-      //     break;
-      //   }
-      // }
-    })
+        
+
+        for (let yPos = Math.max(heightPoint, 32); yPos > 0; yPos--) {
+          if (yPos > heightPoint) {
+            world.setBlockInternal(Block.Vanilla.StationaryWater, xPos, yPos, zPos)  
+          } else {
+
+            let strataBlock = Block.Vanilla.Dirt
+
+            if (yPos < heightPoint - 3) strataBlock = Block.Vanilla.Stone
+            
+            world.setBlockInternal(strataBlock, xPos, yPos, zPos)
+          }
+        }
+
+        let topBlock = Block.Vanilla.GrassBlock
+        if (heightPoint < 32) {
+          topBlock = Block.Vanilla.Sand
+        }
+        world.setBlockInternal(topBlock, xPos, heightPoint, zPos)
+      }
+    }
+    console.log('Done')
 
     server.on('command-lobby', (evt: CommandEvent) => {
       evt.deny(`Lobby gamemode handled a command! Params: ${evt.args.join(', ')}`)
@@ -82,6 +100,13 @@ export default class implements GameMode {
     server.on('command-debug', async (evt: CommandEvent) => {
       evt.markHandled()
       switch (evt.args[0]) {
+        case ('standon'): {
+          const b = evt.player.world?.getBlockAtMVec3(MVec3FractionToBlock(evt.player.position).offset(0,-2,0))
+          if (b) {
+            evt.player.sendPacket(OutgoingPackets.Message(`You are standing on ${b}`))
+          }
+          break;
+        }
         case ('world'): {
           const targetWorld = evt.args[1]
           if (server.worlds.has(targetWorld)) {

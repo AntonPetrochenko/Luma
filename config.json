@@ -6,17 +6,17 @@
         "lobby": {
             "gamemode": "luma-lobby",
             "size": [
+                1024,
                 64,
-                64,
-                64
+                1024
             ]
         },
         "freebuild": {
             "gamemode": "luma-freebuild",
             "size": [
+                256,
                 64,
-                64,
-                64
+                256
             ]
         }
     }

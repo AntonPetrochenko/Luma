@@ -136,8 +136,8 @@ function packet_SpawnEffect(
 
 interface ParticleSupportingPlayer extends UnsafePlayer {
   CPE: {
-    registerParticle(effectType: EffectDefinition): void
-    particle(effectId: number, position: MVec3<BlockFractionUnit>, origin?: MVec3<BlockFractionUnit>): void
+    registerParticle(effectType: EffectDefinition): Promise<void>
+    particle(effectId: number, position: MVec3<BlockFractionUnit>, origin?: MVec3<BlockFractionUnit>): Promise<void>
   }
 }
 

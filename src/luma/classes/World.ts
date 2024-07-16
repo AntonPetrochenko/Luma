@@ -12,6 +12,7 @@ import { PositionedBlockMap } from "../data_structures/BlockCollection";
 import { TickEvent } from "../events/TickEvent";
 import { BlockTickEvent } from "../events/BlockTickEvent";
 import { randInt } from "../util/Helpers/RandInt";
+import { clamp } from "../util/Helpers/Clamp";
 
 interface WorldOptions {
   sizeX?: number,
@@ -64,10 +65,12 @@ export class World extends EventEmitter {
 
   public tick(dt: number): TickInfo {
     //Update entities
+    let entityUpdatePackets = Buffer.alloc(0);
     this.entities.forEach((entity) => {
       entity.update(dt)
-      this.broadcast(OutgoingPackets.SetPositionAndOrientation(entity.getEntityId(), entity))
+      entityUpdatePackets = Buffer.concat([entityUpdatePackets, OutgoingPackets.SetPositionAndOrientation(entity.getEntityId(), entity)])
     })
+    this.broadcast(entityUpdatePackets)
     //Emit global tick
     this.emit('tick', new TickEvent(dt))
     //Emit dedicated block tick events
@@ -101,15 +104,22 @@ export class World extends EventEmitter {
   }
 
   private blockIndex(x: number, y: number, z: number) {
+    x = clamp(0,x,this.sizeX)
+    y = clamp(0,y,this.sizeY)
+    z = clamp(0,z,this.sizeZ)
     //height is Y
     //width is X
     //depth is Z
-    //XZY order (thanks, notch!)
-    return this.sizeY*this.sizeX*y + this.sizeX*z + x
+    //Unwronged (still thanks, Notch!)
+    return x + this.sizeX * (y + this.sizeY * z);
   }
 
   public getBlockAtXYZ(x: number, y: number, z: number): number {
-    return this.blocks[this.blockIndex(x,y,z)]
+    return this.blocks[this.blockIndex(
+      x,
+      y,
+      z
+    )]
   }
   public getBlockAtMVec3(position: MVec3<BlockUnit>): number {
     if (
@@ -123,7 +133,7 @@ export class World extends EventEmitter {
     }
   }
 
-  private setBlockInternal(blockID: number, x: number, y: number, z: number) {
+  public setBlockInternal(blockID: number, x: number, y: number, z: number) {
     this.blocks[this.blockIndex(x,y,z)] = blockID
   }
 

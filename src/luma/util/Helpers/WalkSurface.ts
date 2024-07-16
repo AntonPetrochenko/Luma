@@ -1,13 +1,14 @@
-export function walkSurface(fromU: number, fromV: number, toU: number, toV: number, cbb: (u: number, v: number) => void) {
-  let count = 0;
-  const cb = (a: number,b: number) => { count+=1; cbb(a,b) }
-  for (let ui = fromU; ui < toU; ui++) {
-    for (let vi = fromV; vi < toV; vi++) {
+
+const surfaceStepSize = 0.5
+
+export function walkSurface(fromU: number, fromV: number, toU: number, toV: number, cb: (u: number, v: number) => void) {
+  for (let ui = fromU; ui < toU; ui+=surfaceStepSize) {
+    for (let vi = fromV; vi < toV; vi+=surfaceStepSize) {
       cb(ui, vi)
     }
     cb(ui, toV)
   } 
-  for (let vi = fromV; vi < toV; vi++) {
+  for (let vi = fromV; vi < toV; vi+=surfaceStepSize) {
     cb(toU, vi)
   }
   cb(toU, toV)
