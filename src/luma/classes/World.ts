@@ -232,7 +232,7 @@ export class World extends EventEmitter {
     this.entities.add(entity)
     entity.addToWorld(this, newId)
 
-    this.broadcast(OutgoingPackets.SpawnPlayer(newId, 'TESTIFICATE', entity))
+    this.broadcast(OutgoingPackets.SpawnPlayer(newId, 'Steve', entity))
 
   }
 

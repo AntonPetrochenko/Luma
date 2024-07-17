@@ -23,27 +23,30 @@ export const meta: GameModeMeta = {
 export default class implements GameMode {
   setup(world: World, server: MinecraftClassicServer) {
     
-    const noises = [
+    const noisesMain = [
       {scale: 128, amplitude: 10},
       {scale: 256, amplitude: 20},
-      {scale: 64, amplitude: 5}
+      {scale: 64, amplitude: 5},
+      {scale: 16, amplitude: 2},
     ]
 
-    const noises2 = [
+    const noisesShatter = [
       {scale: 64, amplitude: 10},
       {scale: 32, amplitude: 2}
     ]
 
-    const noiseGen = createNoise2D()
-    const noiseGen2 = createNoise2D()
+    const noiseGenMain = createNoise2D()
+    const noiseGenRaiser = createNoise2D()
+    const noiseGenShatter = createNoise2D()
+    const noiseGenShatterShaper = createNoise2D()
     console.log('Raising...')
     for (let zPos = 0; zPos < world.sizeZ; zPos++) {
       for (let xPos = 0; xPos < world.sizeX; xPos++) {
         
 
         let heightPoint = 40
-        noises.forEach( n => {
-          heightPoint += noiseGen(xPos/n.scale,zPos/n.scale)  * n.amplitude
+        noisesMain.forEach( n => {
+          heightPoint += noiseGenMain(xPos/n.scale,zPos/n.scale)  * n.amplitude
         })
 
         
@@ -51,13 +54,15 @@ export default class implements GameMode {
         const distanceFromCenter = distance2d(world.sizeX/2, world.sizeZ/2, xPos, zPos)
         heightPoint -= (distanceFromCenter/world.sizeY)*4
         
+        let topBlock = Block.Vanilla.GrassBlock
         if (heightPoint > 32) {
-          const raiser = noiseGen2((xPos+noiseGen2(xPos/64, zPos/64)*8)/64, (zPos+noiseGen2(xPos/64, zPos/64)*8)/64)
-          if (raiser > 0.5) {
+          const raiser = noiseGenRaiser((xPos+noiseGenShatterShaper(xPos/16, zPos/16)*16)/64, (zPos+noiseGenShatterShaper(xPos/64, zPos/64)*16)/64)
+          if (raiser > 0.4) {
 
+            topBlock = Math.random() < 0.5 ? Block.Vanilla.Cobblestone : Block.Vanilla.MossyCobblestone
             let heightPoint2 = 0
-            noises2.forEach( n => {
-              heightPoint2 += noiseGen2(xPos/n.scale,zPos/n.scale)  * n.amplitude
+            noisesShatter.forEach( n => {
+              heightPoint2 += noiseGenShatter(xPos/n.scale,zPos/n.scale)  * n.amplitude
             })
 
             heightPoint += heightPoint2
@@ -72,7 +77,7 @@ export default class implements GameMode {
 
         
 
-        for (let yPos = Math.max(heightPoint, 32); yPos > 0; yPos--) {
+        for (let yPos = Math.max(heightPoint, 36); yPos > 0; yPos--) {
           if (yPos > heightPoint) {
             world.setBlockInternal(Block.Vanilla.StationaryWater, xPos, yPos, zPos)  
           } else {
@@ -85,8 +90,7 @@ export default class implements GameMode {
           }
         }
 
-        let topBlock = Block.Vanilla.GrassBlock
-        if (heightPoint < 32) {
+        if (heightPoint < (38 + Math.abs(noiseGenShatter(xPos/64,zPos/64)*4))) {
           topBlock = Block.Vanilla.Sand
         }
         world.setBlockInternal(topBlock, xPos, heightPoint, zPos)
