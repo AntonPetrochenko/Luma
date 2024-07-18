@@ -23,8 +23,8 @@ export interface NetworkSafePlayer extends UnsafePlayer {
 }
 
 
-export function verifyWorldSafe(player: UnsafePlayer, world: World): player is WorldSafePlayer {
-  return player.entityId !== undefined && world.players.has(player) && player.world == world
+export function verifyWorldSafe(player: UnsafePlayer, world?: World): player is WorldSafePlayer {
+  return !!(player.entityId !== undefined && world?.players.has(player) && player.world == world)
 }
 
 /**

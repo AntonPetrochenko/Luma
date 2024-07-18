@@ -31,7 +31,7 @@ export class World extends EventEmitter {
   /** Properly zero-filled in the constructor via generateSimple */
   private blocks: Uint8Array;
   public players = new Set<UnsafePlayer>()
-  public entities = new Set<EntityBase>()
+  public entities = new Map<number, EntityBase>()
   private gamemode: GameMode | undefined
 
   public tickPerChunk = 10;
@@ -229,11 +229,23 @@ export class World extends EventEmitter {
 
     const newId = this.idTracker.take()
 
-    this.entities.add(entity)
+    this.entities.set(newId, entity)
     entity.addToWorld(this, newId)
 
     this.broadcast(OutgoingPackets.SpawnPlayer(newId, 'Steve', entity))
 
+  }
+
+  despawnEntityById(id: number) {
+    if (this.entities.has(id)) {
+      this.entities.delete(id)
+      this.broadcast(OutgoingPackets.DespawnPlayer(id))
+      this.idTracker.return(id)
+    }
+  }
+
+  getEntityById(id: number) {
+    return this.entities.get(id)
   }
 
 

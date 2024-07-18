@@ -3,13 +3,16 @@ import { Orientation } from "../../util/Vectors/Orientation";
 import { World } from "../World";
 import { RaycastResult, castAlong } from "../../util/FastVoxelRaycast";
 import { walkSurface } from "../../util/Helpers/WalkSurface";
-import { globalParticleEffect } from "../../cpe_modules/CustomParticles";
+// import { globalParticleEffect } from "../../cpe_modules/CustomParticles";
 
 export interface Mobile {
   position: MVec3<BlockFractionUnit>
   orientation: Orientation
   eyeLevel: BlockFractionUnit
 }
+
+export const NON_SOLIDS: number[] = []
+export const LIQUIDS: number[] = []
 
 const GRAVITY = -3.92*10
 const ESCAPE_IOTA = 2 // Clutch. Not an epsilon because that's usually a "small" value, but this is still an insignificant value
@@ -65,10 +68,11 @@ export abstract class EntityBase implements Mobile {
     this.position = position
     this.orientation = orientation ?? new Orientation(0,0)
   }
-  public hasGravity = true  
+  public gravity = GRAVITY
   public hasPhysics = true
 
   public move(dt: number) {
+    // return
     if (!this.world) {
       throw new Error('Entity cannot be updated before being assigned a world')
     }
@@ -112,16 +116,38 @@ export abstract class EntityBase implements Mobile {
         yWorldPosition as BlockUnit, 
         zWorldPosition as BlockUnit
       )
-      const newCollision = castAlong(
+      let newCollision = castAlong(
         world, 
         vec,
         motionThisTick,
-        motionThisTick.magnitude
+        motionThisTick.magnitude,
+        {
+          skipList: NON_SOLIDS
+        }
       )
-      
-      if (newCollision && ( newCollision.normal[0] < 0 || newCollision.normal[0] > 0 ) ) {
+
+      if ( 
+        newCollision && 
+        newCollision.normal[0] == 0 &&
+        newCollision.normal[1] == 0 &&
+        newCollision.normal[2] == 0
+       ) {
+        newCollision = castAlong( // retry
+          world, 
+          vec,
+          motionThisTick,
+          motionThisTick.magnitude,
+          {
+            skipList: NON_SOLIDS,
+            skipPositions: [vec]
+          }
+        )   
+      }
+
+      if (newCollision && ( newCollision.normal[0] < 0 || newCollision.normal[0] > 0 )) {
         xCollision = newCollision
       }
+      
     })
     
     const pickedYSurface = motionThisTick.y < 0 ? localHitbox.y : localHitboxFarPoint.y
@@ -133,12 +159,30 @@ export abstract class EntityBase implements Mobile {
         zWorldPosition as BlockUnit
       )
 
-      const newCollision = castAlong(
+      let newCollision = castAlong(
         world, 
         vec,
         motionThisTick,
         motionThisTick.magnitude
       )
+      
+      if ( 
+        newCollision && 
+        newCollision.normal[0] == 0 &&
+        newCollision.normal[1] == 0 &&
+        newCollision.normal[2] == 0
+       ) {
+        newCollision = castAlong( // retry
+          world, 
+          vec,
+          motionThisTick,
+          motionThisTick.magnitude,
+          {
+            skipList: NON_SOLIDS,
+            skipPositions: [vec]
+          }
+        )   
+      }
       
       if (newCollision && ( newCollision.normal[1] < 0 || newCollision.normal[1] > 0 ) ) {
         yCollision = newCollision
@@ -154,12 +198,30 @@ export abstract class EntityBase implements Mobile {
         pickedZSurface as BlockUnit
       )
 
-      const newCollision = castAlong(
+      let newCollision = castAlong(
         world, 
         vec,
         motionThisTick,
         motionThisTick.magnitude
       )
+
+      if ( 
+        newCollision && 
+        newCollision.normal[0] == 0 &&
+        newCollision.normal[1] == 0 &&
+        newCollision.normal[2] == 0
+       ) {
+        newCollision = castAlong( // retry
+          world, 
+          vec,
+          motionThisTick,
+          motionThisTick.magnitude,
+          {
+            skipList: NON_SOLIDS,
+            skipPositions: [vec]
+          }
+        ) 
+      }
       
       if (newCollision && ( newCollision.normal[2] < 0 || newCollision.normal[2] > 0 ) ) {
         zCollision = newCollision
@@ -226,7 +288,9 @@ export abstract class EntityBase implements Mobile {
     this.move(dt)
     
     //Apply gravity
-    this.velocity = this.velocity.offset(0,GRAVITY*dt,0)
+    if (this.gravity) {
+      this.velocity = this.velocity.offset(0,GRAVITY*dt,0)
+    }
 
     //invisible walls
 

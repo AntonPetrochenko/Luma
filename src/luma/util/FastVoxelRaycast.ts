@@ -1,11 +1,21 @@
 import {default as raycast} from 'fast-voxel-raycast'
-import { MVec3, BlockUnit, BlockFractionUnit } from './Vectors/MVec3'
+import { MVec3, BlockUnit } from './Vectors/MVec3'
 import { World } from '../classes/World'
 import { Orientation } from './Vectors/Orientation'
 
-export function makeVoxelGetter(world: World) {
+interface IGetterOpts {
+  skipList?: number[]
+  skipPositions?: MVec3<BlockUnit>[]
+}
+
+export function makeVoxelGetter(world: World, opts: IGetterOpts)  {
   return function (x: number, y: number, z: number) {
-    return world.getBlockAtXYZ(x,y,z)
+    if (opts.skipPositions && opts.skipPositions.find( (m) => { return m.clientX == x && m.clientY == y && m.clientZ == z })) return 0
+    
+    const foundId = world.getBlockAtXYZ(x,y,z)
+    if (opts.skipList && opts.skipList.includes(foundId)) return 0
+
+    return foundId
   }
 }
 
@@ -17,10 +27,10 @@ export interface RaycastResult {
 }
 
 /** Wrapped Fast Voxel Raycast */
-export function castAlong(world: World, origin: MVec3<BlockUnit>, direction: MVec3<BlockUnit>, distance = 128): RaycastResult | undefined {
+export function castAlong(world: World, origin: MVec3<BlockUnit>, direction: MVec3<BlockUnit>, distance = 128, getterOpts: IGetterOpts = {}): RaycastResult | undefined {
   const out_position: [number, number, number] = [0,0,0]
   const out_normal: [number, number, number] = [0,0,0]
-  const result = raycast( makeVoxelGetter(world), origin.toArray(), direction.normalized().toArray(), distance, out_position, out_normal)
+  const result = raycast( makeVoxelGetter(world, getterOpts), origin.toArray(), direction.normalized().toArray(), distance, out_position, out_normal)
 
   const resultPosition = new MVec3(...out_position as [BlockUnit, BlockUnit, BlockUnit])
 
