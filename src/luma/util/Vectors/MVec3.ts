@@ -1,9 +1,13 @@
+import { mod } from "../Helpers/Modulo"
 import { Nominal } from "../Helpers/Nominal"
+import { Orientation } from "./Orientation"
 
 export type BlockUnit = Nominal<number, 'BlockUnit'>
 export type BlockFractionUnit = Nominal<number, 'BlockFractionUnit'>
 
-type MinecraftLengthUnit = BlockUnit | BlockFractionUnit
+export type MinecraftLengthUnit = BlockUnit | BlockFractionUnit
+
+const hpi = Math.PI / 2
 
 /** A nominally typed vec3 in Minecraft space. Immutable, methods return new MVec3. */
 export class MVec3<NumberType extends MinecraftLengthUnit> {
@@ -60,6 +64,16 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
     )
   }
 
+  divRound(d: number) {
+    return new MVec3<NumberType> (
+      this.x / d as NumberType, 
+      this.y / d as NumberType, 
+      this.z / d as NumberType  
+    )
+  }
+
+
+
   public get magnitude(): NumberType {
     return Math.sqrt(this.x**2 + this.y**2 + this.z**2) as NumberType
   }
@@ -76,6 +90,14 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
       this.y / this.magnitude as NumberType,
       this.z / this.magnitude as NumberType,
     ) 
+  }
+
+  toOrientation(): Orientation {
+    const pitch = mod( ( Math.asin (this.y)        ) / Math.PI * 128, 256 );
+
+    const yaw =   mod( ( Math.atan2(this.z, this.x) - hpi ) / Math.PI * 128, 256)
+
+    return new Orientation(yaw, pitch)
   }
 
   

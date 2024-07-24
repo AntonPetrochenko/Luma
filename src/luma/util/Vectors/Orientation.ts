@@ -1,5 +1,6 @@
 import { lerp } from "../Helpers/Lerp"
-import { BlockFractionUnit, BlockUnit, MVec3 } from "./MVec3"
+import { mod } from "../Helpers/Modulo"
+import { BlockFractionUnit, BlockUnit, MinecraftLengthUnit, MVec3 } from "./MVec3"
 
 /** 
  * Minecraft yaw/pitch pair. Immutable. 
@@ -25,6 +26,11 @@ export class Orientation {
   }
 
   //Interpolate towards another angle
+
+  public lerpTo(o: Orientation, amt: number) {
+    return this.lerp(o.yaw, o.pitch, amt)
+  }
+
   public lerp(goalYaw: number, goalPitch: number, amt: number) {
     return new Orientation(
       Orientation.lerpAxisToClosest( this.yaw, goalYaw, amt, this.precision ),
@@ -34,6 +40,13 @@ export class Orientation {
 
   public isEqualTo(other: Orientation) {
     return Math.floor(this.yaw) == Math.floor(other.yaw) && Math.floor(this.pitch) == Math.floor(other.pitch)
+  }
+
+  public static lookAt<T extends MinecraftLengthUnit>(from: MVec3<T>, to: MVec3<T>) {
+    return new Orientation(
+      mod(Math.atan2(to.z - from.z, to.x - from.x) / Math.PI * 128, 256) ,
+      mod(Math.atan2(to.y - from.y, to.x - from.x) / Math.PI * 128, 256) 
+    )
   }
 
   public toNormalVec3<T extends BlockUnit | BlockFractionUnit>(): MVec3<T> {

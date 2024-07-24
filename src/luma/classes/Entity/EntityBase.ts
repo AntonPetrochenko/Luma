@@ -2,7 +2,7 @@ import { BlockFractionUnit, BlockUnit, MVec3, MVec3BlockToFraction, MVec3Fractio
 import { Orientation } from "../../util/Vectors/Orientation";
 import { World } from "../World";
 import { RaycastResult, castAlong } from "../../util/FastVoxelRaycast";
-import { walkSurface } from "../../util/Helpers/WalkSurface";
+import { walkSurface, walkVolume } from "../../util/Helpers/WalkSurface";
 // import { globalParticleEffect } from "../../cpe_modules/CustomParticles";
 
 export interface Mobile {
@@ -11,8 +11,24 @@ export interface Mobile {
   eyeLevel: BlockFractionUnit
 }
 
-export const NON_SOLIDS: number[] = []
-export const LIQUIDS: number[] = []
+
+export const NON_SOLIDS = new Set<number>([
+  Block.Vanilla.FlowingWater, 
+  Block.Vanilla.StationaryWater, 
+  Block.Vanilla.FlowingLava, 
+  Block.Vanilla.StationaryLava, 
+  Block.Vanilla.Flower, 
+  Block.Vanilla.Rose, 
+  Block.Vanilla.RedMushroom, 
+  Block.Vanilla.BrownMushroom
+])
+
+export const LIQUIDS = new Set<number>([
+  Block.Vanilla.FlowingWater,
+  Block.Vanilla.StationaryWater,
+  Block.Vanilla.FlowingLava,
+  Block.Vanilla.StationaryLava
+])
 
 const GRAVITY = -3.92*10
 const ESCAPE_IOTA = 2 // Clutch. Not an epsilon because that's usually a "small" value, but this is still an insignificant value
@@ -33,6 +49,7 @@ export abstract class EntityBase implements Mobile {
   }
 
   public grounded = true;
+  public inFluid = false;
 
   public readonly eyeLevel = 51 as BlockFractionUnit
   
@@ -116,33 +133,16 @@ export abstract class EntityBase implements Mobile {
         yWorldPosition as BlockUnit, 
         zWorldPosition as BlockUnit
       )
-      let newCollision = castAlong(
+      const newCollision = castAlong(
         world, 
         vec,
         motionThisTick,
         motionThisTick.magnitude,
         {
-          skipList: NON_SOLIDS
+          skipList: NON_SOLIDS,
+          skipPositions: [vec]
         }
       )
-
-      if ( 
-        newCollision && 
-        newCollision.normal[0] == 0 &&
-        newCollision.normal[1] == 0 &&
-        newCollision.normal[2] == 0
-       ) {
-        newCollision = castAlong( // retry
-          world, 
-          vec,
-          motionThisTick,
-          motionThisTick.magnitude,
-          {
-            skipList: NON_SOLIDS,
-            skipPositions: [vec]
-          }
-        )   
-      }
 
       if (newCollision && ( newCollision.normal[0] < 0 || newCollision.normal[0] > 0 )) {
         xCollision = newCollision
@@ -152,37 +152,22 @@ export abstract class EntityBase implements Mobile {
     
     const pickedYSurface = motionThisTick.y < 0 ? localHitbox.y : localHitboxFarPoint.y
     walkSurface(localHitbox.x, localHitbox.z, localHitboxFarPoint.x, localHitboxFarPoint.z, (xWorldPosition, zWorldPosition) => {
-      // debug_array.push([xWorldPosition, pickedYSurface, zWorldPosition])
       const vec = new MVec3<BlockUnit>(
         xWorldPosition as BlockUnit, 
         pickedYSurface as BlockUnit, 
         zWorldPosition as BlockUnit
       )
 
-      let newCollision = castAlong(
+      const newCollision = castAlong(
         world, 
         vec,
         motionThisTick,
-        motionThisTick.magnitude
+        motionThisTick.magnitude,
+        {
+          skipList: NON_SOLIDS,
+          skipPositions: [vec]
+        }
       )
-      
-      if ( 
-        newCollision && 
-        newCollision.normal[0] == 0 &&
-        newCollision.normal[1] == 0 &&
-        newCollision.normal[2] == 0
-       ) {
-        newCollision = castAlong( // retry
-          world, 
-          vec,
-          motionThisTick,
-          motionThisTick.magnitude,
-          {
-            skipList: NON_SOLIDS,
-            skipPositions: [vec]
-          }
-        )   
-      }
       
       if (newCollision && ( newCollision.normal[1] < 0 || newCollision.normal[1] > 0 ) ) {
         yCollision = newCollision
@@ -191,37 +176,22 @@ export abstract class EntityBase implements Mobile {
     
     const pickedZSurface = motionThisTick.z < 0 ? localHitbox.z : localHitboxFarPoint.z
     walkSurface(localHitbox.x, localHitbox.y, localHitboxFarPoint.x, localHitboxFarPoint.y, (xWorldPosition, yWorldPosition) => {
-
       const vec = new MVec3<BlockUnit>(
         xWorldPosition as BlockUnit, 
         yWorldPosition as BlockUnit, 
         pickedZSurface as BlockUnit
       )
 
-      let newCollision = castAlong(
+      const newCollision = castAlong(
         world, 
         vec,
         motionThisTick,
-        motionThisTick.magnitude
+        motionThisTick.magnitude,
+        {
+          skipList: NON_SOLIDS,
+          skipPositions: [vec]
+        }
       )
-
-      if ( 
-        newCollision && 
-        newCollision.normal[0] == 0 &&
-        newCollision.normal[1] == 0 &&
-        newCollision.normal[2] == 0
-       ) {
-        newCollision = castAlong( // retry
-          world, 
-          vec,
-          motionThisTick,
-          motionThisTick.magnitude,
-          {
-            skipList: NON_SOLIDS,
-            skipPositions: [vec]
-          }
-        ) 
-      }
       
       if (newCollision && ( newCollision.normal[2] < 0 || newCollision.normal[2] > 0 ) ) {
         zCollision = newCollision
@@ -262,7 +232,6 @@ export abstract class EntityBase implements Mobile {
       }
 
     }
-
     
     if (zCollision) {
       const zCollisionFraction = MVec3BlockToFraction(zCollision.position)
@@ -284,8 +253,31 @@ export abstract class EntityBase implements Mobile {
 
   public update(dt: number) {
     //Do the normal things
+    
+    const worldPosition = MVec3FractionToBlock(this.position)
+    const overlappingBlocks = new Set<number>()
+    walkVolume( worldPosition.sum(this.hitboxOrigin), worldPosition.sum(this.hitboxFarPoint), (x: number, y: number, z: number) => {
+      const o = this.world?.getBlockAtXYZ(x,y,z)
+      if (o) {
+        overlappingBlocks.add(o)
+      }
+    } )
+
+    if (LIQUIDS.intersection(overlappingBlocks).size) {
+      this.inFluid = true
+      this.grounded = true
+    }
+
+    if (this.inFluid) {
+      this.velocity = this.velocity.scaled(0.6)
+    }
+
     this.think(dt)
     this.move(dt)
+
+    this.inFluid = false
+
+
     
     //Apply gravity
     if (this.gravity) {

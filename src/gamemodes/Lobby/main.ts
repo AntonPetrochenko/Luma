@@ -176,6 +176,13 @@ export default class implements GameMode {
           break;
         }
 
+        case ('corner'): {
+          if (Mod_MessageTypes.supportedBy(evt.player)) {
+            evt.player.CPE.sendTypedMessage(MessageType.BottomRight1, evt.args[1])
+          }
+          break;
+        }
+
         case('particletest'): {
           if (Mod_CustomParticles.supportedBy(evt.player)) {
             await evt.player.CPE.registerParticle({

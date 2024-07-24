@@ -43,5 +43,13 @@ export class Monster extends EntityBase {
     this.velocity.x = this.velocity.x * 0.9 as BlockUnit
     this.velocity.z = this.velocity.z * 0.9 as BlockUnit
 
-    this.orientation = this.orientation.lerp(this.goalYaw, this.goalPitch, 0.2)  }
+    if (this.world) {
+      const p = this.world.findClosestPlayerFrac(this.position, 999)
+      if (p) {
+        this.orientation = p.position.delta(this.position).normalized().toOrientation()
+      }
+    }
+
+    // this.orientation = this.orientation.lerp(this.goalYaw, this.goalPitch, 0.2)  
+  }
 }

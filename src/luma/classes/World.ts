@@ -3,7 +3,7 @@ import { EventEmitter } from "stream";
 import { gzipSync } from "zlib";
 import { GameMode } from "../interfaces/GameMode";
 import { EntityIdTracker } from "../util/EntityIdTracker";
-import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3";
+import { BlockFractionUnit, BlockUnit, MVec3, MVec3BlockToFraction, MVec3FractionToBlock } from "../util/Vectors/MVec3";
 import { EntityBase } from "./Entity/EntityBase";
 import { UnsafePlayer, WorldSafePlayer  } from "./ServerPlayer";
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
@@ -47,6 +47,8 @@ export class World extends EventEmitter {
     boundPlayer.entityId = newId
     boundPlayer.world = this
 
+
+    boundPlayer.position = new MVec3<BlockFractionUnit>(this.sizeX * 16 as BlockFractionUnit, this.sizeY * 32 as BlockFractionUnit, this.sizeZ * 16 as BlockFractionUnit)
     this.players.add(boundPlayer)
 
     WorldJoinProcedure(boundPlayer, this)
@@ -104,9 +106,9 @@ export class World extends EventEmitter {
   }
 
   private blockIndex(x: number, y: number, z: number) {
-    x = clamp(0,x,this.sizeX)
-    y = clamp(0,y,this.sizeY)
-    z = clamp(0,z,this.sizeZ)
+    x = clamp(0,Math.floor(x),this.sizeX)
+    y = clamp(0,Math.floor(y),this.sizeY)
+    z = clamp(0,Math.floor(z),this.sizeZ)
     //height is Y
     //width is X
     //depth is Z
@@ -146,6 +148,25 @@ export class World extends EventEmitter {
       this.blocks[this.blockIndex(position.clientX, position.clientY, position.clientZ)] = blockID
       this.blockUpdatesThisTick.setBlock(position, blockID)
     }
+  }
+  
+  public findClosestPlayerFrac(position: MVec3<BlockFractionUnit>, maxDistance = 128) {
+    const players: [UnsafePlayer, number][] = []
+    this.players.forEach( p => {
+      const dist = p.position.delta(position).magnitude
+        players.push([p, dist])
+    }) 
+
+    players.sort( (a, b) => a[1] - b[1] )
+
+    const found = players.pop()
+    if (found) {
+      return found[0]
+    }
+  }
+
+  public findClosestPlayer(position: MVec3<BlockUnit>, maxDistance = 32) {
+    return this.findClosestPlayerFrac(MVec3BlockToFraction(position), maxDistance)
   }
 
   /**
