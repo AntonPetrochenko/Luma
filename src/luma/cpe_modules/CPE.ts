@@ -1,6 +1,7 @@
 import { MinecraftClassicServer } from "../classes/MinecraftClassicServer"
 import { UnsafePlayer } from "../classes/ServerPlayer"
 import { CPE_ExtEntry } from "../packet_wrappers/IncomingPackets"
+import { Mod_ChangeModel } from "./ChangeModel"
 import { Mod_CustomParticles } from "./CustomParticles"
 import { Mod_MessageTypes } from "./MessageType"
 import { Mod_PlayerClick } from "./PlayerClick"
@@ -24,5 +25,6 @@ export interface CPE_IncomingPacket {
 export const LumaCPESupportInfo: CPESupportEntry<unknown & UnsafePlayer>[] = [
   {extName: 'MessageTypes', version: 1, mod: Mod_MessageTypes},
   {extName: 'CustomParticles', version: 1, mod: Mod_CustomParticles },
-  {extName: 'PlayerClick', version: 1, mod: Mod_PlayerClick}
+  {extName: 'PlayerClick', version: 1, mod: Mod_PlayerClick},
+  {extName: 'ChangeModel', version: 2, mod: Mod_ChangeModel}
 ]

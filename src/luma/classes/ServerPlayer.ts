@@ -1,11 +1,11 @@
-import { Socket } from "net";
+import { Socket } from "node:net";
 import { BlockFractionUnit, MVec3 } from "../util/Vectors/MVec3";
 import { Orientation } from "../util/Vectors/Orientation";
 import { Mobile } from "./Entity/EntityBase";
 import { MinecraftClassicServer } from "./MinecraftClassicServer";
 import { World } from "./World";
 import { CPE_ExtEntry } from "../packet_wrappers/IncomingPackets";
-import { EventEmitter } from "stream";
+import { EventEmitter } from "node:events";
 
 
 
@@ -40,7 +40,9 @@ export interface WorldSafePlayer extends UnsafePlayer {
 export class UnsafePlayer extends EventEmitter implements Mobile  {
   public CPE = {} as {[x: string]: ((...args: never[]) => unknown) | undefined}
   
-  public eyeLevel = 0 as BlockFractionUnit; 
+  public eyeLevel = 51 as BlockFractionUnit; 
+  public doEyeLevelCorrection = false;
+
   public sendPacket(packet: Buffer): Promise<void> {
     return new Promise((resolve) => {
       const w = () => {

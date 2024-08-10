@@ -1,9 +1,9 @@
 import { pack } from "python-struct";
-import { EventEmitter } from "stream";
-import { gzipSync } from "zlib";
+import { EventEmitter } from "node:events";
+import { gzipSync } from "node:zlib";
 import { GameMode } from "../interfaces/GameMode";
 import { EntityIdTracker } from "../util/EntityIdTracker";
-import { BlockFractionUnit, BlockUnit, MVec3, MVec3BlockToFraction, MVec3FractionToBlock } from "../util/Vectors/MVec3";
+import { BlockFractionUnit, BlockUnit, MVec3, MVec3BlockToFraction } from "../util/Vectors/MVec3";
 import { EntityBase } from "./Entity/EntityBase";
 import { UnsafePlayer, WorldSafePlayer  } from "./ServerPlayer";
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
@@ -157,7 +157,7 @@ export class World extends EventEmitter {
         players.push([p, dist])
     }) 
 
-    players.sort( (a, b) => a[1] - b[1] )
+    players.sort( (a, b) => b[1] - a[1] )
 
     const found = players.pop()
     if (found) {

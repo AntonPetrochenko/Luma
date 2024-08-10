@@ -129,11 +129,6 @@ function packet_SpawnEffect(
   )
 }
 
-
-
-
-
-
 interface ParticleSupportingPlayer extends UnsafePlayer {
   CPE: {
     registerParticle(effectType: EffectDefinition): Promise<void>

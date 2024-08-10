@@ -49,7 +49,7 @@ export function SpawnPlayer(playerId: number, playerName: string, player: Mobile
     playerId,
     mcstring(playerName),
     player.position.clientX,
-    player.position.clientY,
+    player.position.clientY + (player.doEyeLevelCorrection ? player.eyeLevel : 0),
     player.position.clientZ,
     player.orientation.yaw,
     player.orientation.pitch
@@ -69,7 +69,7 @@ export function SetPositionAndOrientation(playerId: number, player: Mobile) {
     0x08,
     playerId,
     player.position.clientX,
-    clamp(player.position.clientY + player.eyeLevel, 0, 65535),
+    clamp(player.position.clientY + (player.doEyeLevelCorrection ? player.eyeLevel : 0), 0, 65535),
     player.position.clientZ,
     player.orientation.yaw,
     player.orientation.pitch

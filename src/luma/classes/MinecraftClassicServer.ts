@@ -10,25 +10,25 @@
  * 
  */
 
-import * as Net from 'net'
+import * as Net from 'node:net'
 import '../enums/MinecraftBlockID'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { dumpBufferToString } from '../util/Helpers/HexDumper'
 import { UnsafePlayer, verifyNetworkSafe, verifyWorldSafe } from './ServerPlayer'
 import { World } from './World'
-import { Socket } from "net"
+import { Socket } from "node:net"
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
 import * as IncomingPackets from "../packet_wrappers/IncomingPackets"
-import { EventEmitter } from 'stream'
+import { EventEmitter } from 'node:stream'
 import { Config } from '../util/Config'
 import * as glob from 'glob'
-import * as path from 'path'
+import * as path from 'node:path'
 import { GameModeModule } from '../interfaces/GameMode'
 import { CommandEvent } from '../events/CommandEvent'
 import { PlayerJoinEvent } from '../events/PlayerJoinEvent'
 import { PlayerMovedEvent } from '../events/PlayerMovedEvent'
 import { SetBlockEvent } from '../events/SetBlockEvent'
-import { WriteStream, createWriteStream } from 'fs'
+import { WriteStream, createWriteStream } from 'node:fs'
 import { CPE_IncomingPacket, LumaCPESupportInfo } from '../cpe_modules/CPE'
 
 const defaultConfig =

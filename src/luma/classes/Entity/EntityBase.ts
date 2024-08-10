@@ -9,6 +9,7 @@ export interface Mobile {
   position: MVec3<BlockFractionUnit>
   orientation: Orientation
   eyeLevel: BlockFractionUnit
+  doEyeLevelCorrection: boolean
 }
 
 
@@ -37,6 +38,8 @@ export abstract class EntityBase implements Mobile {
   public world: World | undefined
 
   private entityId = -1
+
+  doEyeLevelCorrection = true;
   
   getEntityId() { return this.entityId }
   addToWorld(world: World, id: number) { 

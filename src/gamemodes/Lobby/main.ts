@@ -6,7 +6,7 @@ import { GameMode, GameModeMeta } from "../../luma/interfaces/GameMode";
 import * as OutgoingPackets from '../../luma/packet_wrappers/OutgoingPackets'
 import { createReadStream } from "fs";
 import { dumpBufferToString } from "../../luma/util/Helpers/HexDumper";
-import { BlockUnit, MVec3, MVec3BlockToFraction, MVec3FractionToBlock } from "../../luma/util/Vectors/MVec3";
+import { BlockFractionUnit, BlockUnit, MVec3, MVec3BlockToFraction, MVec3FractionToBlock } from "../../luma/util/Vectors/MVec3";
 import { MessageType, Mod_MessageTypes } from "../../luma/cpe_modules/MessageType";
 import { verifyWorldSafe } from "../../luma/classes/ServerPlayer";
 import { Monster } from "../../luma/classes/Entity/Monster";
@@ -14,6 +14,7 @@ import { Mod_CustomParticles } from "../../luma/cpe_modules/CustomParticles";
 import { createNoise2D } from "simplex-noise";
 import { distance2d } from "../../luma/util/Helpers/Distance";
 import { PlayerClickEvent } from "../../luma/cpe_modules/PlayerClick";
+import { Mod_ChangeModel } from "../../luma/cpe_modules/ChangeModel";
 
 export const meta: GameModeMeta = {
   identifier: 'luma-lobby',
@@ -205,7 +206,7 @@ export default class implements GameMode {
         }
 
         case ('g'): {
-          const monster = new Monster(evt.player.position)
+          const monster = new Monster( evt.player.position.offset(0,-evt.player.eyeLevel,0) ) 
 
           if (evt.player.world) {
             evt.player.world.spawnEntity(monster)
@@ -218,6 +219,22 @@ export default class implements GameMode {
           const monster = new Monster(MVec3BlockToFraction(new MVec3<BlockUnit>(20 as BlockUnit,20 as BlockUnit,20 as BlockUnit)))
           if (evt.player.world) {
             evt.player.world.spawnEntity(monster)
+          }
+          break;
+        }
+
+        case ('model'): {
+          const mdl = evt.args[1] ?? 'humanoid'
+          if (evt.player.world) {
+            evt.player.world.players.forEach( (p) => {
+              if (Mod_ChangeModel.supportedBy(p)) {
+                if (p == evt.player) {
+                  p.CPE.changeModel(-1, mdl)
+                } else {
+                  p.CPE.changeModel(p.entityId ?? 0, mdl)
+                }
+              }
+            } )
           }
           break;
         }

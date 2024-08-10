@@ -46,7 +46,7 @@ export class Monster extends EntityBase {
     if (this.world) {
       const p = this.world.findClosestPlayerFrac(this.position, 999)
       if (p) {
-        this.orientation = p.position.delta(this.position).normalized().toOrientation()
+        this.orientation = p.position.delta(this.position.offset(0,p.eyeLevel,0)).normalized().toOrientation()
       }
     }
 
