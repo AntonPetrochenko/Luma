@@ -5,8 +5,8 @@ Experimental Minecraft Classic server implemented in TypeScript, then taken way 
 
 ## Useful links
 
-- [Minecraft Classic protocol specification](https://wiki.vg/Classic_Protocol)
-- [Classic Protocol Extension (CPE) specification](https://wiki.vg/Classic_Protocol_Extension)
+- [Minecraft Classic protocol specification](https://minecraft.wiki/w/Classic_server_protocol)
+- [Classic Protocol Extension (CPE) specification](https://minecraft.wiki/w/Minecraft_Wiki:Projects/wiki.vg_merge/Classic_Protocol_Extension)
 
 ## Current state of the project
 - Normal 0.30 protocol implemented in full
