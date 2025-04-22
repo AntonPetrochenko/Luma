@@ -36,6 +36,11 @@ export async function WorldJoinProcedure(joiningPlayer: UnsafePlayer, world: Wor
     
     //Spawn the new player for others
     world.broadcastNotSelf(joiningPlayer, OutgoingPackets.SpawnPlayer(joiningPlayer.entityId, joiningPlayer.username, joiningPlayer))
+
+    //Spawn entities for the player
+    world.entities.forEach( (entity) => {
+      joiningPlayer.sendPacket(OutgoingPackets.SpawnPlayer(entity.getEntityId(), 'Steve', entity))
+    })
     
     //Finally, announce in chat
     world.broadcast(OutgoingPackets.Message(`&b${joiningPlayer.username} joined the world`))

@@ -1,9 +1,13 @@
+import { mod } from "../Helpers/Modulo"
 import { Nominal } from "../Helpers/Nominal"
+import { Orientation } from "./Orientation"
 
 export type BlockUnit = Nominal<number, 'BlockUnit'>
 export type BlockFractionUnit = Nominal<number, 'BlockFractionUnit'>
 
-type MinecraftLengthUnit = BlockUnit | BlockFractionUnit
+export type MinecraftLengthUnit = BlockUnit | BlockFractionUnit
+
+const hpi = Math.PI / 2
 
 /** A nominally typed vec3 in Minecraft space. Immutable, methods return new MVec3. */
 export class MVec3<NumberType extends MinecraftLengthUnit> {
@@ -14,7 +18,7 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
     public y: NumberType,
     public z: NumberType
   ) {
-    this.identity = `${Math.floor(this.x)} ${Math.floor(this.y)} ${Math.floor(this.z)}`
+    this.identity = `X: ${Math.floor(this.x)} Y: ${Math.floor(this.y)} Z: ${Math.floor(this.z)}`
   }
 
   //As far as Minecraft is concerned, these are integers. Let's treat them appropriately.
@@ -60,8 +64,18 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
     )
   }
 
+  divRound(d: number) {
+    return new MVec3<NumberType> (
+      this.x / d as NumberType, 
+      this.y / d as NumberType, 
+      this.z / d as NumberType  
+    )
+  }
+
+
+
   public get magnitude(): NumberType {
-    return Math.sqrt(this.x^2 + this.y^2 + this.z^2) as NumberType
+    return Math.sqrt(this.x**2 + this.y**2 + this.z**2) as NumberType
   }
 
   public normalized() {
@@ -76,6 +90,14 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
       this.y / this.magnitude as NumberType,
       this.z / this.magnitude as NumberType,
     ) 
+  }
+
+  toOrientation(): Orientation {
+    const pitch = mod( ( Math.asin (this.y)        ) / Math.PI * 128, 256 );
+
+    const yaw =   mod( ( Math.atan2(this.z, this.x) - hpi ) / Math.PI * 128, 256)
+
+    return new Orientation(yaw, pitch)
   }
 
   
@@ -99,6 +121,9 @@ export class MVec3<NumberType extends MinecraftLengthUnit> {
 
   static zeroBlock = new MVec3<BlockUnit>(0 as BlockUnit,0 as BlockUnit,0 as BlockUnit)
   static zeroFraction = new MVec3<BlockFractionUnit>(0 as BlockFractionUnit,0 as BlockFractionUnit,0 as BlockFractionUnit)
+
+  static makeZeroBlock = () => new MVec3<BlockUnit>(0 as BlockUnit,0 as BlockUnit,0 as BlockUnit)
+  static makeZeroFraction = () => new MVec3<BlockFractionUnit>(0 as BlockFractionUnit,0 as BlockFractionUnit,0 as BlockFractionUnit)
 
   static fromArray<NumberType extends MinecraftLengthUnit>(vec: [number, number, number]) {
     return new MVec3<NumberType>(

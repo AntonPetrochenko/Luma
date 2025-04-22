@@ -1,9 +1,9 @@
 import { pack } from "python-struct";
-import { EventEmitter } from "stream";
-import { gzipSync } from "zlib";
+import { EventEmitter } from "node:events";
+import { gzipSync } from "node:zlib";
 import { GameMode } from "../interfaces/GameMode";
 import { EntityIdTracker } from "../util/EntityIdTracker";
-import { BlockFractionUnit, BlockUnit, MVec3 } from "../util/Vectors/MVec3";
+import { BlockFractionUnit, BlockUnit, MVec3, MVec3BlockToFraction } from "../util/Vectors/MVec3";
 import { EntityBase } from "./Entity/EntityBase";
 import { UnsafePlayer, WorldSafePlayer  } from "./ServerPlayer";
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
@@ -12,6 +12,7 @@ import { PositionedBlockMap } from "../data_structures/BlockCollection";
 import { TickEvent } from "../events/TickEvent";
 import { BlockTickEvent } from "../events/BlockTickEvent";
 import { randInt } from "../util/Helpers/RandInt";
+import { clamp } from "../util/Helpers/Clamp";
 
 interface WorldOptions {
   sizeX?: number,
@@ -30,7 +31,7 @@ export class World extends EventEmitter {
   /** Properly zero-filled in the constructor via generateSimple */
   private blocks: Uint8Array;
   public players = new Set<UnsafePlayer>()
-  public entities = new Set<EntityBase>()
+  public entities = new Map<number, EntityBase>()
   private gamemode: GameMode | undefined
 
   public tickPerChunk = 10;
@@ -46,6 +47,8 @@ export class World extends EventEmitter {
     boundPlayer.entityId = newId
     boundPlayer.world = this
 
+
+    boundPlayer.position = new MVec3<BlockFractionUnit>(this.sizeX * 16 as BlockFractionUnit, this.sizeY * 32 as BlockFractionUnit, this.sizeZ * 16 as BlockFractionUnit)
     this.players.add(boundPlayer)
 
     WorldJoinProcedure(boundPlayer, this)
@@ -64,10 +67,12 @@ export class World extends EventEmitter {
 
   public tick(dt: number): TickInfo {
     //Update entities
+    let entityUpdatePackets = Buffer.alloc(0);
     this.entities.forEach((entity) => {
       entity.update(dt)
-      this.broadcast(OutgoingPackets.SetPositionAndOrientation(entity.getEntityId(), entity))
+      entityUpdatePackets = Buffer.concat([entityUpdatePackets, OutgoingPackets.SetPositionAndOrientation(entity.getEntityId(), entity)])
     })
+    this.broadcast(entityUpdatePackets)
     //Emit global tick
     this.emit('tick', new TickEvent(dt))
     //Emit dedicated block tick events
@@ -101,15 +106,22 @@ export class World extends EventEmitter {
   }
 
   private blockIndex(x: number, y: number, z: number) {
+    x = clamp(0,Math.floor(x),this.sizeX)
+    y = clamp(0,Math.floor(y),this.sizeY)
+    z = clamp(0,Math.floor(z),this.sizeZ)
     //height is Y
     //width is X
     //depth is Z
-    //XZY order (thanks, notch!)
-    return this.sizeY*this.sizeX*y + this.sizeX*z + x
+    //Unwronged (still thanks, Notch!)
+    return x + this.sizeX * (y + this.sizeY * z);
   }
 
   public getBlockAtXYZ(x: number, y: number, z: number): number {
-    return this.blocks[this.blockIndex(x,y,z)]
+    return this.blocks[this.blockIndex(
+      x,
+      y,
+      z
+    )]
   }
   public getBlockAtMVec3(position: MVec3<BlockUnit>): number {
     if (
@@ -123,7 +135,7 @@ export class World extends EventEmitter {
     }
   }
 
-  private setBlockInternal(blockID: number, x: number, y: number, z: number) {
+  public setBlockInternal(blockID: number, x: number, y: number, z: number) {
     this.blocks[this.blockIndex(x,y,z)] = blockID
   }
 
@@ -136,6 +148,25 @@ export class World extends EventEmitter {
       this.blocks[this.blockIndex(position.clientX, position.clientY, position.clientZ)] = blockID
       this.blockUpdatesThisTick.setBlock(position, blockID)
     }
+  }
+  
+  public findClosestPlayerFrac(position: MVec3<BlockFractionUnit>, maxDistance = 128) {
+    const players: [UnsafePlayer, number][] = []
+    this.players.forEach( p => {
+      const dist = p.position.delta(position).magnitude
+        players.push([p, dist])
+    }) 
+
+    players.sort( (a, b) => b[1] - a[1] )
+
+    const found = players.pop()
+    if (found) {
+      return found[0]
+    }
+  }
+
+  public findClosestPlayer(position: MVec3<BlockUnit>, maxDistance = 32) {
+    return this.findClosestPlayerFrac(MVec3BlockToFraction(position), maxDistance)
   }
 
   /**
@@ -219,11 +250,23 @@ export class World extends EventEmitter {
 
     const newId = this.idTracker.take()
 
-    this.entities.add(entity)
+    this.entities.set(newId, entity)
     entity.addToWorld(this, newId)
 
-    this.broadcast(OutgoingPackets.SpawnPlayer(newId, 'TESTIFICATE', entity))
+    this.broadcast(OutgoingPackets.SpawnPlayer(newId, 'Steve', entity))
 
+  }
+
+  despawnEntityById(id: number) {
+    if (this.entities.has(id)) {
+      this.entities.delete(id)
+      this.broadcast(OutgoingPackets.DespawnPlayer(id))
+      this.idTracker.return(id)
+    }
+  }
+
+  getEntityById(id: number) {
+    return this.entities.get(id)
   }
 
 

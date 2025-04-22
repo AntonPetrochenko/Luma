@@ -10,33 +10,33 @@
  * 
  */
 
-import * as Net from 'net'
+import * as Net from 'node:net'
 import '../enums/MinecraftBlockID'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { dumpBufferToString } from '../util/Helpers/HexDumper'
 import { UnsafePlayer, verifyNetworkSafe, verifyWorldSafe } from './ServerPlayer'
 import { World } from './World'
-import { Socket } from "net"
+import { Socket } from "node:net"
 import * as OutgoingPackets from "../packet_wrappers/OutgoingPackets"
 import * as IncomingPackets from "../packet_wrappers/IncomingPackets"
-import { EventEmitter } from 'stream'
+import { EventEmitter } from 'node:stream'
 import { Config } from '../util/Config'
 import * as glob from 'glob'
-import * as path from 'path'
+import * as path from 'node:path'
 import { GameModeModule } from '../interfaces/GameMode'
 import { CommandEvent } from '../events/CommandEvent'
 import { PlayerJoinEvent } from '../events/PlayerJoinEvent'
 import { PlayerMovedEvent } from '../events/PlayerMovedEvent'
 import { SetBlockEvent } from '../events/SetBlockEvent'
-import { WriteStream, createWriteStream } from 'fs'
-import { LumaCPESupportInfo } from '../cpe_modules/CPE'
+import { WriteStream, createWriteStream } from 'node:fs'
+import { CPE_IncomingPacket, LumaCPESupportInfo } from '../cpe_modules/CPE'
 
 const defaultConfig =
   {
-    name: 'Unnamed server',
-    motd: 'Nothing to say about this server',
+    name: 'Luma Test Server',
+    motd: 'Test server for Luma server software',
     defaultWorld: 'lobby',
-    tickInterval: 1/(1000/20),
+    tickInterval: 1000/20,
     worlds: {
       lobby: {
         gamemode: 'luma-lobby',
@@ -109,7 +109,13 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
         while (cursor < packetBuffer.length) {
           //The first byte we encounter is definitely a packetId
           const packetId = packetBuffer[cursor]
-          const packetLength = packetLengthLookupTable[packetId]
+          let packetLength: number | undefined = packetLengthLookupTable[packetId]
+
+          if (!packetLength) {
+            console.log(Array.from(this.registeredCPEPackets.entries()))
+            packetLength = this.registeredCPEPackets.get(packetId)?.length
+          }
+
           if (packetLength) {
             //This handles reads after buffer length, so we're safe
             //In case we get a partial packet at the end of the incomingBuffer,
@@ -175,7 +181,7 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       const newWorld = new World({
         sizeX: worldInfo.size[0],
         sizeY: worldInfo.size[1],
-        sizeZ: worldInfo.size[3]
+        sizeZ: worldInfo.size[2]
       })
 
       const worldGameModeModule = gamemodes.get(worldInfo.gamemode)
@@ -204,14 +210,21 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
     
     //Start ticking worlds
     //TODO: Use delta time
-    this.worldTickingInterval = setInterval(this.worldTick.bind(this), this.config.settings.tickInterval)
+    this.worldTickingInterval = setInterval(this.worldTick.bind(this), 50)
 
+    // Setup CPE
+    LumaCPESupportInfo.forEach( (e) => {
+      if (e.mod.setup) {
+        e.mod.setup(this)
+      }
+    })
   }
 
   private worldTick() {
+    const dt = this.config.settings.tickInterval/1000
     this.worlds.forEach( (world) => {
       //TODO: Use delta time
-      const worldTickInfo = world.tick(this.config.settings.tickInterval)
+      const worldTickInfo = world.tick(dt)
       world.players.forEach( player => {
         if (player.supports('BulkBlockUpdate')) {
           //Brew BulkBlockUpdate packets
@@ -470,8 +483,25 @@ export class MinecraftClassicServer extends EventEmitter { //extending EventEmit
       }
 
       default: 
-        throw new Error('Handled unknown packet. This can no longer happen. You win!')
-        break;
+        this.tryHandleCPEPacket(packet, sender)
+      break;
     }
+  }
+
+  
+  private registeredCPEPackets: Map<number, CPE_IncomingPacket> = new Map()
+
+  private tryHandleCPEPacket(inPacket: Buffer, sender: UnsafePlayer) {
+    const packetId = inPacket.readInt8(0)
+    const packInfo = this.registeredCPEPackets.get(packetId)
+    if (packInfo) {
+      packInfo.handler(inPacket, sender)
+    } else {
+      throw new Error('Handled unknown packet. This can no longer happen. You win!')
+    }
+  }
+
+  public registerCPEPacket(id: number, packInfo: CPE_IncomingPacket) {
+    this.registeredCPEPackets.set(id, packInfo)
   }
 }

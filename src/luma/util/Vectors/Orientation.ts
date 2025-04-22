@@ -1,46 +1,60 @@
 import { lerp } from "../Helpers/Lerp"
-import { BlockFractionUnit, BlockUnit, MVec3 } from "./MVec3"
+import { mod } from "../Helpers/Modulo"
+import { BlockFractionUnit, BlockUnit, MinecraftLengthUnit, MVec3 } from "./MVec3"
 
 /** 
  * Minecraft yaw/pitch pair. Immutable. 
  * In Minecraft Classic, radians map as [0,255] -> [0,2pi]
  * */
 export class Orientation {
-  public get yaw() { return Math.floor(this._yaw)%256 }
-  public get pitch() { return Math.floor(this._pitch)%256 }
+  public precision = 256 
+  public get yaw() { return Math.floor(this._yaw)%(this.precision) }
+  public get pitch() { return Math.floor(this._pitch)%(this.precision) }
 
-  //Lerp helper to wrap a radian angle (in Minecraft units, 0-255)
-  static lerpAxisToClosest(oStart: number, oEnd: number, amt: number) {
-    const oEndShifted = oEnd - 256
+  //Lerp helper to wrap a radian angle (in Minecraft units, 0-255 EXCEPT SOME CPE)
+  static lerpAxisToClosest(oStart: number, oEnd: number, amt: number, precision: number) {
+    const oEndShifted = oEnd - precision
 
     const distanceReal = Math.abs(oEnd - oStart)
     const distanceShifted = Math.abs(oEndShifted - oStart)
 
     if (distanceReal > distanceShifted) {
-      return Math.floor( lerp( oStart, oEndShifted, amt ) )%256
+      return Math.floor( lerp( oStart, oEndShifted, amt ) )%precision
     } else {
-      return Math.floor( lerp( oStart, oEnd, amt ) )%256
+      return Math.floor( lerp( oStart, oEnd, amt ) )%precision
     }
   }
 
   //Interpolate towards another angle
+
+  public lerpTo(o: Orientation, amt: number) {
+    return this.lerp(o.yaw, o.pitch, amt)
+  }
+
   public lerp(goalYaw: number, goalPitch: number, amt: number) {
     return new Orientation(
-      Orientation.lerpAxisToClosest( this.yaw, goalYaw, amt ),
-      Orientation.lerpAxisToClosest( this.pitch, goalPitch, amt )
+      Orientation.lerpAxisToClosest( this.yaw, goalYaw, amt, this.precision ),
+      Orientation.lerpAxisToClosest( this.pitch, goalPitch, amt, this.precision )
     )
   }
 
   public isEqualTo(other: Orientation) {
-    return this.yaw == other.yaw && this.pitch == other.pitch
+    return Math.floor(this.yaw) == Math.floor(other.yaw) && Math.floor(this.pitch) == Math.floor(other.pitch)
+  }
+
+  public static lookAt<T extends MinecraftLengthUnit>(from: MVec3<T>, to: MVec3<T>) {
+    return new Orientation(
+      mod(Math.atan2(to.z - from.z, to.x - from.x) / Math.PI * 128, 256) ,
+      mod(Math.atan2(to.y - from.y, to.x - from.x) / Math.PI * 128, 256) 
+    )
   }
 
   public toNormalVec3<T extends BlockUnit | BlockFractionUnit>(): MVec3<T> {
-    //minecraft world is z-up, therefore
+    //minecraft world is y-up, therefore
     // yaw is along x-y
     // pitch is along x-z
-    const yawCorrected = Math.PI * ((this.yaw-64)/128)
-    const pitchCorrected = Math.PI * (this.pitch/128)
+    const yawCorrected = Math.PI * ((this.yaw-64)/(this.precision/2))
+    const pitchCorrected = Math.PI * (this.pitch/(this.precision/2))
     const xzLen = Math.cos(-pitchCorrected)
     const x = xzLen * Math.cos(-yawCorrected)
     const y = Math.sin(-pitchCorrected)
@@ -51,8 +65,10 @@ export class Orientation {
   }
   private _yaw: number
   private _pitch: number
-  constructor(yaw: number, pitch: number) {
+  constructor(yaw: number, pitch: number, precision?: number) {
     this._yaw = yaw,
     this._pitch = pitch
+    if (precision)
+      this.precision = precision
   }
 }

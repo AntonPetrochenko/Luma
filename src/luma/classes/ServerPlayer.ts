@@ -1,10 +1,11 @@
-import { Socket } from "net";
+import { Socket } from "node:net";
 import { BlockFractionUnit, MVec3 } from "../util/Vectors/MVec3";
 import { Orientation } from "../util/Vectors/Orientation";
 import { Mobile } from "./Entity/EntityBase";
 import { MinecraftClassicServer } from "./MinecraftClassicServer";
 import { World } from "./World";
 import { CPE_ExtEntry } from "../packet_wrappers/IncomingPackets";
+import { EventEmitter } from "node:events";
 
 
 
@@ -22,8 +23,8 @@ export interface NetworkSafePlayer extends UnsafePlayer {
 }
 
 
-export function verifyWorldSafe(player: UnsafePlayer, world: World): player is WorldSafePlayer {
-  return player.entityId !== undefined && world.players.has(player) && player.world == world
+export function verifyWorldSafe(player: UnsafePlayer, world?: World): player is WorldSafePlayer {
+  return !!(player.entityId !== undefined && world?.players.has(player) && player.world == world)
 }
 
 /**
@@ -36,10 +37,12 @@ export interface WorldSafePlayer extends UnsafePlayer {
   connected: true
 }
 
-export class UnsafePlayer implements Mobile {
+export class UnsafePlayer extends EventEmitter implements Mobile  {
   public CPE = {} as {[x: string]: ((...args: never[]) => unknown) | undefined}
   
-  public eyeLevel = 0 as BlockFractionUnit; 
+  public eyeLevel = 51 as BlockFractionUnit; 
+  public doEyeLevelCorrection = false;
+
   public sendPacket(packet: Buffer): Promise<void> {
     return new Promise((resolve) => {
       const w = () => {
@@ -90,6 +93,7 @@ export class UnsafePlayer implements Mobile {
   }
 
   constructor(socket: Socket, world: World) {
+    super() 
     this.socket = socket
     this.world = world
   }
